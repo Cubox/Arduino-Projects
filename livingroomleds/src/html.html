@@ -1,0 +1,112 @@
+#include <ESP8266WiFi.h>
+
+const char htmlTemplate[] PROGMEM = \
+R"(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>LEDs</title>
+    <meta charset="UTF-8">
+    <meta name=viewport content="width=device-width, initial-scale=1">
+    <style>
+        body {
+        text-align: center;
+        background: #344e5c;
+        font-family: sans-serif;
+        text-transform: uppercase;
+        color: #FFF;
+        font-size: 1.5em;
+        font-weight: bold;
+        }
+        table {
+        width: 100%%;
+        margin-bottom: 30px;
+        }
+        table td {
+        padding: 0 15px;
+        }
+        .input {
+        text-align:center;
+        border:#344e9D;
+        margin-top: 15px;
+        height:40px;
+        width: 100%%;
+        border-radius:20px
+        }
+        .send {
+        width: 50%%;
+        height: 40px;
+        background: white;
+        border: 0;
+        border-radius: 20px;
+        margin-top: 10px;
+        text-transform: uppercase;
+        font-weight: bold;
+        color: #333;
+        font-size: 1em;
+        }
+        .rainbow {
+        background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+        background-size: 1800%% 1800%%;
+        animation: rainbow 10s ease infinite;
+        -webkit-animation: rainbow 10s ease infinite;
+        }
+        @keyframes rainbow { 
+            0%%{background-position:0%% 82%%}
+            50%%{background-position:100%% 19%%}
+            100%%{background-position:0%% 82%%}
+        }
+        @-webkit-keyframes rainbow {
+            0%%{background-position:0%% 82%%}
+            50%%{background-position:100%% 19%%}
+            100%%{background-position:0%% 82%%}
+        }
+    </style>
+</head>
+<body>
+    <form method="post">
+        <h1>LEDS</h1>
+        <table>
+            <tr>
+            <td>RED</td>
+            <td>GREEN</td>
+            <td>BLUE</td>
+            </tr>
+            <tr>
+                <td>
+                    <input type="number" id="red" name="red" class="input" value=%d>
+                </td>
+                <td>
+                    <input type="number" id="green" name="green" class="input" value=%d>
+                </td>
+                <td>
+                    <input type="number" id="blue" name="blue" class="input" value=%d>
+                </td>
+            </tr>
+        </table>
+        <div style="padding:15px;">
+            <input type="range" name="brightness" class="input" min="0" max="255" value=%d>
+        </div>
+        <input type="submit" value="Send" class="send">
+        <button type="submit" name="rainbow" value="true" class="send rainbow">Rainbow</button>
+        <button type="submit" name="epilepsy" value="true" class="send">Epilepsy</button>
+    </form>
+    <button id="white">Blanc Normal</button>
+    <button id="lowbrightness">Veilleuse</button>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $("#white").click(function () {
+                $("#red").val("255");
+                $("#green").val("155");
+                $("#blue").val("25");
+                $("#brightness").val(200);
+            });
+            $("#lowbrightness").click(function () {
+                $("brightness").val(50);
+            });
+        });
+    </script>
+</body>
+</html>
+)";

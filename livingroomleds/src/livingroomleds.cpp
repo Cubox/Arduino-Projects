@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <EEPROM.h>
 #include <ESP8266WebServer.h>
@@ -28,9 +29,10 @@ byte green;
 byte blue;
 byte brightness;
 bool rainbow = false;
+bool epilepsy = false;
 bool toUpdate = true;
 
-#include "html.h" // htmlTemplate
+#include "html.html" // htmlTemplate
 
 ESP8266WebServer server(80);
 // RemoteDebug Debug;
@@ -72,7 +74,12 @@ void handleIndexPost() {
 
     if (server.arg("rainbow") != "") {
         rainbow = true;
+        epilepsy = false;
+    } else if (server.arg("epilepsy") != "") {
+        rainbow = false;
+        epilepsy = true;
     } else {
+        epilepsy = false;
         rainbow = false;
     }
     EEPROM.write(4, rainbow);
@@ -144,8 +151,7 @@ void setup() {
     server.on("/", HTTP_POST, handleIndexPost);
     server.begin();
 
-    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)
-            .setCorrection(TypicalLEDStrip);
+    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
     FastLED.setBrightness(brightness);
 
     currentPalette = RainbowColors_p;
@@ -167,12 +173,18 @@ void loop() {
     static uint8_t startIndex = 0;
     startIndex = startIndex + 1; /* motion speed */
 
-    if (toUpdate || rainbow) {
+    if (toUpdate || rainbow || epilepsy) {
         toUpdate = false;
         if (rainbow) {
             FillLEDsFromPaletteColors(startIndex);
+        } else if (epilepsy) {
+            FastLED.delay(20);
+            FastLED.setBrightness(0);
+            FastLED.show();
+            FastLED.delay(20);
         } else {
             fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
+
         }
         FastLED.setBrightness(brightness);
         FastLED.show();

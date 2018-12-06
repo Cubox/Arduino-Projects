@@ -35,7 +35,7 @@ bool toUpdate = true;
 #include "html.html" // htmlTemplate
 
 ESP8266WebServer server(80);
-// RemoteDebug Debug;
+//RemoteDebug Debug;
 
 void redirect303(const String &url) {
     server.sendHeader("Location", url);
@@ -48,10 +48,12 @@ void onMissing() {
 }
 
 void handleIndexGet() {
-    char *buffer = (char *)malloc(sizeof(htmlTemplate) + 42);
-    sprintf_P(buffer, htmlTemplate, red, green, blue, brightness);
-    server.send(200, "text/html", buffer);
-    free(buffer);
+    char *bufferHtml = (char *)malloc(sizeof(htmlTemplate) + 42);
+    char *bufferCss = (char *)malloc(sizeof(htmlTemplateCSS));
+    strcpy_P(bufferCss, htmlTemplateCSS);
+    sprintf_P(bufferHtml, htmlTemplate, bufferCss, red, green, blue, brightness);
+    server.send(200, "text/html", bufferHtml);
+    free(bufferHtml);
 }
 
 void handleIndexPost() {
@@ -142,7 +144,7 @@ void setup() {
     // Serial.print("IP address: ");
     // Serial.println(WiFi.localIP());
 
-    // Debug.begin("Telnet_HostName");
+    //Debug.begin("Telnet_HostName");
 
     // respond to GET requests on URL /heap
 
@@ -151,7 +153,7 @@ void setup() {
     server.on("/", HTTP_POST, handleIndexPost);
     server.begin();
 
-    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection(TypicalLEDStrip)*/;
     FastLED.setBrightness(brightness);
 
     currentPalette = RainbowColors_p;
@@ -197,6 +199,6 @@ void loop() {
     // FastLED.delay(1000 / UPDATES_PER_SECOND);
     // if (millis() % 1000 == 0)
     ArduinoOTA.handle();
-    // Debug.handle();
+    //Debug.handle();
     server.handleClient();
 }

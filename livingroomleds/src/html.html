@@ -1,5 +1,3 @@
-#include <ESP8266WiFi.h>
-
 const char htmlTemplateCSS[] PROGMEM = \
 R"(
     <style>
@@ -55,6 +53,16 @@ R"(
             50%{background-position:100% 19%}
             100%{background-position:0% 82%}
         }
+        .blinking {
+	        animation: blinkingText 0.2s infinite;
+        }
+        @keyframes blinkingText {
+	        0% {color: #000;}
+	        49% {color: transparent;}
+	        50% {color: transparent;}
+	        99% {color: transparent;}
+	        100% {color: #000;}
+        }
     </style>
 )";
 
@@ -90,26 +98,42 @@ R"(
             </tr>
         </table>
         <div style="padding:15px;">
-            <input type="range" name="brightness" class="input" min="0" max="255" value=%d>
+            <input type="range" id="brightness" name="brightness" class="input" min="0" max="255" value=%d>
         </div>
+
+        <input type="number" id="brightnessClone" name="brightnessClone" class="input">
         <input type="submit" value="Send" class="send">
         <button type="submit" name="rainbow" value="true" class="send rainbow">Rainbow</button>
-        <button type="submit" name="epilepsy" value="true" class="send">Epilepsy</button>
+        <button type="submit" name="epilepsy" value="true" class="send blinking">Epilepsy</button>
+        <button type="submit" name="breath" value="true" class="send">Breath</button>
     </form>
-    <button id="white">Blanc Normal</button>
-    <button id="lowbrightness">Veilleuse</button>
+    <button id="white" class="send">Blanc Normal</button>
+    <button id="lowbrightness" class="send">Veilleuse</button>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script>
         $(document).ready(function() {
             $("#white").click(function () {
                 $("#red").val("255");
-                $("#green").val("155");
-                $("#blue").val("25");
+                $("#green").val("120");
+                $("#blue").val("20");
                 $("#brightness").val(200);
             });
             $("#lowbrightness").click(function () {
-                $("brightness").val(50);
+                $("#brightness").val(50);
             });
+            $("#brightness").change(function() {
+                $("#brightnessClone").val($("#brightness").val());
+            });
+            $("#brightness").on('input', function() {
+    	        $("#brightnessClone").val($("#brightness").val());
+            });
+            $("#brightnessClone").change(function() {
+                $("#brightness").val($("#brightnessClone").val());
+            });
+            $("#brightnessClone").on('input', function() {
+    	        $("#brightness").val($("#brightnessClone").val());
+            });
+            $("#brightnessClone").val($("#brightness").val());
         });
     </script>
 </body>

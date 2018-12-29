@@ -30,6 +30,7 @@ byte blue;
 byte brightness;
 bool rainbow = false;
 bool epilepsy = false;
+bool breath = false;
 bool toUpdate = true;
 
 #include "html.html" // htmlTemplate
@@ -48,12 +49,15 @@ void onMissing() {
 }
 
 void handleIndexGet() {
-    char *bufferHtml = (char *)malloc(sizeof(htmlTemplate) + 42);
+    char *bufferHtml = (char *)malloc(sizeof(htmlTemplate) + sizeof(htmlTemplateCSS) + 42);
     char *bufferCss = (char *)malloc(sizeof(htmlTemplateCSS));
+    memset(bufferHtml, 0, sizeof(htmlTemplate) + 42);
+    memset(bufferCss, 0, sizeof(htmlTemplateCSS));
     strcpy_P(bufferCss, htmlTemplateCSS);
     sprintf_P(bufferHtml, htmlTemplate, bufferCss, red, green, blue, brightness);
     server.send(200, "text/html", bufferHtml);
     free(bufferHtml);
+    free(bufferCss);
 }
 
 void handleIndexPost() {
@@ -77,14 +81,22 @@ void handleIndexPost() {
     if (server.arg("rainbow") != "") {
         rainbow = true;
         epilepsy = false;
+        breath = false;
     } else if (server.arg("epilepsy") != "") {
-        rainbow = false;
         epilepsy = true;
+        rainbow = false;
+        breath = false;
+    } else if (server.arg("breath") != "") {
+        breath = true;
+        rainbow = false;
+        epilepsy = false;
     } else {
         epilepsy = false;
         rainbow = false;
+        breath = false;
     }
     EEPROM.write(4, rainbow);
+    EEPROM.write(5, breath);
 
     EEPROM.commit();
     toUpdate = true;
@@ -95,7 +107,7 @@ void handleIndexPost() {
 void setup() {
     Serial.begin(115200);
     Serial.println("Booting");
-    EEPROM.begin(5);
+    EEPROM.begin(6);
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
@@ -109,6 +121,7 @@ void setup() {
     blue = EEPROM.read(2);
     brightness = EEPROM.read(3); // Load from EEPROM here
     rainbow = EEPROM.read(4);
+    breath = EEPROM.read(5);
 
     ArduinoOTA.setHostname("Leds");
 
@@ -140,20 +153,18 @@ void setup() {
             Serial.println("End Failed");
     });
     ArduinoOTA.begin();
-    // Serial.println("Ready");
-    // Serial.print("IP address: ");
-    // Serial.println(WiFi.localIP());
+    Serial.println("Ready");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
 
     //Debug.begin("Telnet_HostName");
-
-    // respond to GET requests on URL /heap
 
     server.onNotFound(onMissing);
     server.on("/", HTTP_GET, handleIndexGet);
     server.on("/", HTTP_POST, handleIndexPost);
     server.begin();
 
-    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection(TypicalLEDStrip)*/;
+    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
     FastLED.setBrightness(brightness);
 
     currentPalette = RainbowColors_p;
@@ -161,8 +172,6 @@ void setup() {
 }
 
 void FillLEDsFromPaletteColors(uint8_t colorIndex) {
-    uint8_t brightness = BRIGHTNESS;
-
     for (int i = 0; i < NUM_LEDS; i++) {
         leds[i] = ColorFromPalette(currentPalette, colorIndex, brightness, currentBlending);
         colorIndex += 3;
@@ -173,32 +182,39 @@ unsigned long previousMillis = 0;
 
 void loop() {
     static uint8_t startIndex = 0;
-    startIndex = startIndex + 1; /* motion speed */
+    startIndex += 1; /* motion speed */
 
-    if (toUpdate || rainbow || epilepsy) {
-        toUpdate = false;
-        if (rainbow) {
-            FillLEDsFromPaletteColors(startIndex);
-        } else if (epilepsy) {
-            FastLED.delay(20);
-            FastLED.setBrightness(0);
-            FastLED.show();
-            FastLED.delay(20);
-        } else {
-            fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
+/*     // Hardcoded mode
+    toUpdate = true;
+    breath = false;
+    red = 255;
+    green = 0;
+    blue = 255;
+    rainbow = false;
+    epilepsy = false;
+    brightness = 100; */
 
-        }
-        FastLED.setBrightness(brightness);
+    if (rainbow) {
+        FillLEDsFromPaletteColors(startIndex);
+    } if (epilepsy) {
+        FastLED.delay(20);
+        FastLED.setBrightness(0);
         FastLED.show();
+        FastLED.delay(20);
+        startIndex += 1;
+    } if (breath) {
+        double breathValue, modifiedBrightness;
+        breathValue = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
+        modifiedBrightness = map(breathValue, 0, 255, 0, brightness);
+        FastLED.setBrightness(modifiedBrightness);
+    } if (toUpdate) {
+        fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
+        toUpdate = false;
     }
-
-    // FastLED.delay(200);
-    // FastLED.setBrightness(0);
-    // FastLED.show();
-    // FastLED.delay(200);
-    // FastLED.delay(1000 / UPDATES_PER_SECOND);
-    // if (millis() % 1000 == 0)
+    if (!breath) {
+        FastLED.setBrightness(brightness);
+    }
+    FastLED.show();
     ArduinoOTA.handle();
-    //Debug.handle();
     server.handleClient();
 }

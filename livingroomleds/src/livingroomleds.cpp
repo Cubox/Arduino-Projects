@@ -4,7 +4,6 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-#define MAX_TIME_INACTIVE -1 // Disable timeout feature
 #include <RemoteDebug.h>
 #include <WiFiUdp.h>
 //#define FASTLED_INTERRUPT_RETRY_COUNT 1

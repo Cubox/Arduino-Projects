@@ -4,11 +4,16 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-//#include <RemoteDebug.h>
+#define MAX_TIME_INACTIVE -1 // Disable timeout feature
+#include <RemoteDebug.h>
 #include <WiFiUdp.h>
 //#define FASTLED_INTERRUPT_RETRY_COUNT 1
 //#define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
+
+#include <TimeLib.h>
+#include <NTPClientLib.h>
+
 #include "secrets.h"
 
 #define LED_PIN 2
@@ -24,19 +29,21 @@ const char *password = PASSWORD;
 CRGBPalette16 currentPalette;
 TBlendType currentBlending;
 
-byte red;
-byte green;
-byte blue;
-byte brightness;
-bool rainbow = false;
-bool epilepsy = false;
-bool breath = false;
-bool toUpdate = true;
-
 #include "html.html" // htmlTemplate
 
 ESP8266WebServer server(80);
-//RemoteDebug Debug;
+RemoteDebug Debug;
+
+struct configuration {
+    uint8_t brightness;
+    uint8_t red, green, blue;
+    bool rainbow, epilepsy, breath;
+};
+
+bool toUpdate = true;
+
+struct configuration savedConf;
+struct configuration loopConf;
 
 void redirect303(const String &url) {
     server.sendHeader("Location", url);
@@ -54,7 +61,7 @@ void handleIndexGet() {
     memset(bufferHtml, 0, sizeof(htmlTemplate) + 42);
     memset(bufferCss, 0, sizeof(htmlTemplateCSS));
     strcpy_P(bufferCss, htmlTemplateCSS);
-    sprintf_P(bufferHtml, htmlTemplate, bufferCss, red, green, blue, brightness);
+    sprintf_P(bufferHtml, htmlTemplate, bufferCss, savedConf.red, savedConf.green, savedConf.blue, savedConf.brightness);
     server.send(200, "text/html", bufferHtml);
     free(bufferHtml);
     free(bufferCss);
@@ -62,41 +69,37 @@ void handleIndexGet() {
 
 void handleIndexPost() {
     if (server.arg("red") != "same") {
-        red = server.arg("red").toInt();
-        EEPROM.write(0, red);
+        savedConf.red = server.arg("red").toInt();
     }
     if (server.arg("green") != "same") {
-        green = server.arg("green").toInt();
-        EEPROM.write(1, green);
+        savedConf.green = server.arg("green").toInt();
     }
     if (server.arg("blue") != "same") {
-        blue = server.arg("blue").toInt();
-        EEPROM.write(2, blue);
+        savedConf.blue = server.arg("blue").toInt();
     }
     if (server.arg("brightness") != "same") {
-        brightness = server.arg("brightness").toInt();
-        EEPROM.write(3, brightness);
+        savedConf.brightness = server.arg("brightness").toInt();
     }
 
     if (server.arg("rainbow") != "") {
-        rainbow = true;
-        epilepsy = false;
-        breath = false;
+        savedConf.rainbow = true;
+        savedConf.epilepsy = false;
+        savedConf.breath = false;
     } else if (server.arg("epilepsy") != "") {
-        epilepsy = true;
-        rainbow = false;
-        breath = false;
+        savedConf.epilepsy = true;
+        savedConf.rainbow = false;
+        savedConf.breath = false;
     } else if (server.arg("breath") != "") {
-        breath = true;
-        rainbow = false;
-        epilepsy = false;
+        savedConf.breath = true;
+        savedConf.rainbow = false;
+        savedConf.epilepsy = false;
     } else {
-        epilepsy = false;
-        rainbow = false;
-        breath = false;
+        savedConf.epilepsy = false;
+        savedConf.rainbow = false;
+        savedConf.breath = false;
     }
-    EEPROM.write(4, rainbow);
-    EEPROM.write(5, breath);
+
+    EEPROM.put(0, savedConf);
 
     EEPROM.commit();
     toUpdate = true;
@@ -107,7 +110,7 @@ void handleIndexPost() {
 void setup() {
     Serial.begin(115200);
     Serial.println("Booting");
-    EEPROM.begin(6);
+    EEPROM.begin(sizeof(struct configuration));
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
@@ -116,12 +119,7 @@ void setup() {
         ESP.restart();
     }
 
-    red = EEPROM.read(0);
-    green = EEPROM.read(1);
-    blue = EEPROM.read(2);
-    brightness = EEPROM.read(3); // Load from EEPROM here
-    rainbow = EEPROM.read(4);
-    breath = EEPROM.read(5);
+    EEPROM.get(0, savedConf);
 
     ArduinoOTA.setHostname("Leds");
 
@@ -157,7 +155,8 @@ void setup() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
-    //Debug.begin("Telnet_HostName");
+    Debug.begin("Telnet_HostName");
+    NTP.begin("europe.pool.ntp.org", 1, true, 0);
 
     server.onNotFound(onMissing);
     server.on("/", HTTP_GET, handleIndexGet);
@@ -165,7 +164,7 @@ void setup() {
     server.begin();
 
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-    FastLED.setBrightness(brightness);
+    FastLED.setBrightness(savedConf.brightness);
 
     currentPalette = RainbowColors_p;
     currentBlending = LINEARBLEND;
@@ -173,48 +172,86 @@ void setup() {
 
 void FillLEDsFromPaletteColors(uint8_t colorIndex) {
     for (int i = 0; i < NUM_LEDS; i++) {
-        leds[i] = ColorFromPalette(currentPalette, colorIndex, brightness, currentBlending);
+        leds[i] = ColorFromPalette(currentPalette, colorIndex, loopConf.brightness, currentBlending);
         colorIndex += 3;
     }
 }
 
-unsigned long previousMillis = 0;
+void rgb(struct configuration *conf, int red, int green, int blue) {
+    conf->red = red;
+    conf->green = green;
+    conf->blue = blue;
+}
+
+bool toUpdateNextLoop = false;
+
+// long lastMillis = 0;
+// long loops = 0;
 
 void loop() {
+    // long currentMillis = millis();
+    // loops++;
+    // if (currentMillis - lastMillis > 1000){
+    //     Debug.print("Loops last second: ");
+    //     Debug.println(loops);
+    
+    //     lastMillis = currentMillis;
+    //     loops = 0;
+    // }
     static uint8_t startIndex = 0;
     startIndex += 1; /* motion speed */
 
-/*     // Hardcoded mode
-    toUpdate = true;
-    breath = false;
-    red = 255;
-    green = 0;
-    blue = 255;
-    rainbow = false;
-    epilepsy = false;
-    brightness = 100; */
+    loopConf = savedConf;
+    
+    if (toUpdateNextLoop) {
+        toUpdate = true;
+        toUpdateNextLoop = false;
+    }
 
-    if (rainbow) {
+    time_t t = now();
+    if (hour(t) == 0 && minute(t) == 0 && second(t) == 0) { // midnight, set as full red, warning
+        rgb(&loopConf, 255, 0, 0);
+        loopConf.brightness = 255;
+        toUpdate = true;
+    } else if (hour(t) == 0 && minute(t) == 0 && second(t) == 2) { // two seconds later, dim the brightness. Set sensible colours
+        savedConf.brightness = 50;
+        toUpdate = true;
+    } else if (hour(t) == 7 && minute(t) == 0 && second(t) == 0) { // 7 am, lights off
+        savedConf.brightness = 0;
+    } else if (minute(t) == 0 && second(t) <= 5) {
+        loopConf.rainbow = true;
+        loopConf.breath = false;
+        loopConf.epilepsy = false;
+        loopConf.brightness = 255;
+        toUpdateNextLoop = true;
+    }
+
+    if (loopConf.rainbow) {
         FillLEDsFromPaletteColors(startIndex);
-    } if (epilepsy) {
+    } else if (loopConf.epilepsy) {
         FastLED.delay(20);
         FastLED.setBrightness(0);
         FastLED.show();
         FastLED.delay(20);
         startIndex += 1;
-    } if (breath) {
+    } else if (loopConf.breath) {
         double breathValue, modifiedBrightness;
         breathValue = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-        modifiedBrightness = map(breathValue, 0, 255, 0, brightness);
+        modifiedBrightness = map(breathValue, 0, 255, 0, loopConf.brightness);
         FastLED.setBrightness(modifiedBrightness);
-    } if (toUpdate) {
-        fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
-        toUpdate = false;
     }
-    if (!breath) {
-        FastLED.setBrightness(brightness);
+
+    if (toUpdate && !loopConf.rainbow) {
+        fill_solid(leds, NUM_LEDS, CRGB(loopConf.red, loopConf.green, loopConf.blue));
     }
+
+    if (!loopConf.breath) {
+        FastLED.setBrightness(loopConf.brightness);
+    }
+
+    toUpdate = false; // DO NOT PUT AFTER HTTP HANDLING
     FastLED.show();
     ArduinoOTA.handle();
     server.handleClient();
+    Debug.handle();
 }

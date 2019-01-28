@@ -106,9 +106,11 @@ R"(
         <button type="submit" name="rainbow" value="true" class="send rainbow">Rainbow</button>
         <button type="submit" name="epilepsy" value="true" class="send blinking">Epilepsy</button>
         <button type="submit" name="breath" value="true" class="send">Breath</button>
+        <button type="submit" name="refresh" value="true" class="send">Refresh</button>
     </form>
     <button id="white" class="send">Blanc Normal</button>
     <button id="lowbrightness" class="send">Veilleuse</button>
+    <button id="lightblue" class="send">Blanc froid</button>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script>
         $(document).ready(function() {
@@ -117,6 +119,12 @@ R"(
                 $("#green").val("120");
                 $("#blue").val("20");
                 $("#brightness").val(200);
+            });
+            $("#lightblue").click(function () {
+                $("#red").val("100");
+                $("#green").val("120");
+                $("#blue").val("200");
+                $("#brightness").val(150);
             });
             $("#lowbrightness").click(function () {
                 $("#brightness").val(50);

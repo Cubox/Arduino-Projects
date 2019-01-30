@@ -4,10 +4,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-#include <RemoteDebug.h>
 #include <WiFiUdp.h>
-//#define FASTLED_INTERRUPT_RETRY_COUNT 1
-//#define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 
 #include <TimeLib.h>
@@ -31,7 +28,6 @@ TBlendType currentBlending;
 #include "html.html" // htmlTemplate
 
 ESP8266WebServer server(80);
-RemoteDebug Debug;
 
 struct configuration {
     uint8_t brightness;
@@ -50,7 +46,6 @@ void redirect303(const String &url) {
 }
 
 void onMissing() {
-    // Handle Unknown Request
     server.send(404, "text/html", "Not found");
 }
 
@@ -107,54 +102,26 @@ void handleIndexPost() {
 }
 
 void setup() {
-    Serial.begin(115200);
-    Serial.println("Booting");
     EEPROM.begin(sizeof(struct configuration));
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        Serial.println("Connection Failed! Rebooting...");
         delay(1000);
         ESP.restart();
     }
 
     EEPROM.get(0, savedConf);
 
-    ArduinoOTA.setHostname("Leds");
+    ArduinoOTA.setHostname("leds.cubox");
 
     ArduinoOTA.onStart([]() {
-        String type;
-        if (ArduinoOTA.getCommand() == U_FLASH)
-            type = "sketch";
-        else // U_SPIFFS
-            type = "filesystem";
+        fill_solid(leds, NUM_LEDS, CRGB::Red);
+        FastLED.setBrightness(255);
+        FastLED.show();
+    });
 
-        // SPIFFS.end();
-        Serial.println("Start updating " + type);
-    });
-    ArduinoOTA.onEnd([]() { Serial.println("\nEnd"); });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR)
-            Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR)
-            Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR)
-            Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR)
-            Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR)
-            Serial.println("End Failed");
-    });
     ArduinoOTA.begin();
-    Serial.println("Ready");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
 
-    Debug.begin("Telnet_HostName");
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
 
     server.onNotFound(onMissing);
@@ -184,19 +151,7 @@ void rgb(struct configuration *conf, int red, int green, int blue) {
 
 bool toUpdateNextLoop = false;
 
-// long lastMillis = 0;
-// long loops = 0;
-
 void loop() {
-    // long currentMillis = millis();
-    // loops++;
-    // if (currentMillis - lastMillis > 1000){
-    //     Debug.print("Loops last second: ");
-    //     Debug.println(loops);
-    
-    //     lastMillis = currentMillis;
-    //     loops = 0;
-    // }
     static uint8_t startIndex = 0;
     startIndex += 1; /* motion speed */
 
@@ -217,6 +172,8 @@ void loop() {
         toUpdate = true;
     } else if (hour(t) == 7 && minute(t) == 0 && second(t) == 0) { // 7 am, lights off
         savedConf.brightness = 0;
+    } else if (hour(t) == 18 && minute(t) == 0 && second(t) == 0) {
+        savedConf.brightness = EEPROM.read(offsetof(struct configuration, brightness));
     } else if (minute(t) == 0 && second(t) <= 5) {
         loopConf.rainbow = true;
         loopConf.breath = false;
@@ -252,5 +209,4 @@ void loop() {
     FastLED.show();
     ArduinoOTA.handle();
     server.handleClient();
-    Debug.handle();
 }

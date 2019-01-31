@@ -174,7 +174,7 @@ void loop() {
         savedConf.brightness = 0;
     } else if (hour(t) == 18 && minute(t) == 0 && second(t) == 0) {
         savedConf.brightness = EEPROM.read(offsetof(struct configuration, brightness));
-    } else if (minute(t) == 0 && second(t) <= 5) {
+    } else if (hour(t) >= 8 && minute(t) == 0 && second(t) <= 5) {
         loopConf.rainbow = true;
         loopConf.breath = false;
         loopConf.epilepsy = false;

@@ -132,7 +132,7 @@ void setup() {
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
     FastLED.setBrightness(savedConf.brightness);
 
-    currentPalette = RainbowColors_p;
+    currentPalette = PartyColors_p;
     currentBlending = LINEARBLEND;
 }
 
@@ -173,7 +173,12 @@ void loop() {
     } else if (hour(t) == 7 && minute(t) == 0 && second(t) == 0) { // 7 am, lights off
         savedConf.brightness = 0;
     } else if (hour(t) == 18 && minute(t) == 0 && second(t) == 0) {
-        savedConf.brightness = EEPROM.read(offsetof(struct configuration, brightness));
+        if (savedConf.brightness < 100) {
+            savedConf.brightness = EEPROM.read(offsetof(struct configuration, brightness));
+            if (savedConf.brightness < 100) {
+                savedConf.brightness = 100;
+            }
+        }
     } else if (hour(t) >= 8 && minute(t) == 0 && second(t) <= 5) {
         loopConf.rainbow = true;
         loopConf.breath = false;
@@ -193,7 +198,7 @@ void loop() {
     } else if (loopConf.breath) {
         double breathValue, modifiedBrightness;
         breathValue = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-        modifiedBrightness = map(breathValue, 0, 255, 0, loopConf.brightness);
+        modifiedBrightness = map(breathValue, 0, 255, 20, loopConf.brightness);
         FastLED.setBrightness(modifiedBrightness);
     }
 

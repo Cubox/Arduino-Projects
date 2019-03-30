@@ -3,7 +3,6 @@
 #include <EEPROM.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <FastLED.h>
 
@@ -132,7 +131,7 @@ void setup() {
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
     FastLED.setBrightness(savedConf.brightness);
 
-    currentPalette = PartyColors_p;
+    currentPalette = RainbowColors_p;
     currentBlending = LINEARBLEND;
 }
 
@@ -163,11 +162,11 @@ void loop() {
     }
 
     time_t t = now();
-    if (hour(t) == 0 && minute(t) == 0 && second(t) == 0) { // midnight, set as full red, warning
+    if (hour(t) == 23 && minute(t) == 0 && second(t) == 0) { // 23h, set as full red, warning
         rgb(&loopConf, 255, 0, 0);
         loopConf.brightness = 255;
         toUpdate = true;
-    } else if (hour(t) == 0 && minute(t) == 0 && second(t) == 2) { // two seconds later, dim the brightness. Set sensible colours
+    } else if (hour(t) == 23 && minute(t) == 0 && second(t) == 2) { // two seconds later, dim the brightness.
         savedConf.brightness = 50;
         toUpdate = true;
     } else if (hour(t) == 7 && minute(t) == 0 && second(t) == 0) { // 7 am, lights off
@@ -198,7 +197,7 @@ void loop() {
     } else if (loopConf.breath) {
         double breathValue, modifiedBrightness;
         breathValue = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-        modifiedBrightness = map(breathValue, 0, 255, 20, loopConf.brightness);
+        modifiedBrightness = ::map(breathValue, 0, 255, 20, loopConf.brightness);
         FastLED.setBrightness(modifiedBrightness);
     }
 

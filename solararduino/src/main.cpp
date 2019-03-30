@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #include <LowPower.h>
 #define EI_NOTEXTERNAL
 #include <EnableInterrupt.h>
@@ -6,7 +8,7 @@
 #include <DelayRun.h>
 #define NUM_SAMPLES 200
 
-#define TRIGGER_VOLTAGE 24
+#define TRIGGER_VOLTAGE 22
 #define TRIGGER_DELAY 600000
 
 unsigned long lastTriggerSwitch = 0;
@@ -19,6 +21,8 @@ enum overrideStates {
 };
 
 enum overrideStates overrideState = NORMAL;
+
+void checkVoltageAndAct(Task*);
 
 void overridePressed() {
   if (overrideState == NORMAL) {
@@ -64,8 +68,14 @@ void checkVoltageAndAct(Task* me) {
     }
   }
 
+  if (voltage < 16) { // To prevent relay loop, we stay LOW and ignore all overrides
+    setState(LOW);    // if we are not on battery, which cuts off at 18V
+    overrideState = NORMAL;
+    return;
+  }
+
   if (overrideState == FORCEDON) {
-    setState(HIGH);
+    setState(HIGH);    
   } else if (overrideState == FORCEDOFF) {
     setState(LOW);
   } else if (voltage >= TRIGGER_VOLTAGE) {
@@ -104,7 +114,7 @@ void setup()
   enableInterrupt(12, overridePressed, FALLING);
   SoftTimer.add(&timerAct);
   //SoftTimer.add(&timer3);
-  SoftTimer.add(&timerOutput);
+  //SoftTimer.add(&timerOutput);
   Serial.begin(115200);
 }
 

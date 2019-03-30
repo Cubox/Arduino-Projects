@@ -20,7 +20,7 @@ Adafruit_ADS1115 ads;
 // Nicked this from somewhere, don't know don't ask
 const double multiplier = 0.0625;
 // This depends on the model of clamp being used
-const double FACTOR = 50;
+const double FACTOR = 30;
 
 WiFiClient client;
 
@@ -37,6 +37,7 @@ void setup() {
     ArduinoOTA.begin();
     #if DEBUGGING
     Debug.begin("linky.cubox");
+    Debug.setResetCmdEnabled(true);
     #endif
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
     // Since the max voltage the ADC will see is 1.42, we can double it
@@ -62,7 +63,7 @@ void loop() {
     // Don't forget to update this!
     // We are not reporting power use without the proper time
     // But still need to call "end of loop" functions
-    // (Also will be more obvious if there is a problem, no output)
+    // (Also will be more obvious if there is a time problem, no output)
     if (year() != 2019 && year() != 2020) { 
         NTP.begin("europe.pool.ntp.org", 1, true, 0);
         goto end; // Hehe, fight me
@@ -76,7 +77,7 @@ void loop() {
     }
     t = now();
     currentRMS = getCurrent();
-    power = 224 * currentRMS; // Calibrated for my house
+    power = 225 * currentRMS; // Calibrated for my house
 
     #if DEBUGGING
     rdebugA("%s: Current is: %fA, which makes power: %fW\n", NTP.getTimeDateString().c_str(), currentRMS, power);
@@ -111,6 +112,10 @@ double getCurrent() {
         voltage = ads.readADC_Differential_0_1() * multiplier;
         current = voltage * FACTOR;
         current /= 1000.0;
+
+        // #if DEBUGGING
+        // rdebugAln("%f", current);
+        // #endif
 
         sum += sq(current);
         counter++;

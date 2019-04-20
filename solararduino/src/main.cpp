@@ -8,7 +8,7 @@
 #include <DelayRun.h>
 #define NUM_SAMPLES 200
 
-#define TRIGGER_VOLTAGE 22
+#define TRIGGER_VOLTAGE 21
 #define TRIGGER_DELAY 600000
 
 unsigned long lastTriggerSwitch = 0;
@@ -53,7 +53,7 @@ double measureVoltage() {
     sample_count++;
   }
   // Here the 5 is calibrated 5V pin voltage, 5.6978 is calibrated voltage divider factor
-  voltage = (((double)sum / (double)NUM_SAMPLES * 4.996) / 1024.0) * 5.6978;
+  voltage = (((double)sum / (double)NUM_SAMPLES * 4.997) / 1024.0) * 5.6942;
   return voltage;
 }
 
@@ -94,11 +94,17 @@ void checkVoltageAndAct(Task* me) {
 void printVoltage(Task *me) {
   double voltage = measureVoltage();
 
+  if (voltage < 16) { // To prevent relay loop, we stay LOW and ignore all overrides
+    setState(LOW);    // if we are not on battery, which cuts off at 18V
+    overrideState = NORMAL;
+    return;
+  }
+
   Serial.println(voltage);
   delay(100);
 }
 
-Task timerAct(5000, checkVoltageAndAct);
+Task timerAct(6000, checkVoltageAndAct);
 Task timerOutput(1000, printVoltage);
 
 void setup()
@@ -113,8 +119,7 @@ void setup()
   pinMode(12, INPUT_PULLUP); // override button
   enableInterrupt(12, overridePressed, FALLING);
   SoftTimer.add(&timerAct);
-  //SoftTimer.add(&timer3);
-  //SoftTimer.add(&timerOutput);
+  SoftTimer.add(&timerOutput);
   Serial.begin(115200);
 }
 

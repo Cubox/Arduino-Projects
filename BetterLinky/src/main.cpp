@@ -77,7 +77,7 @@ void loop() {
     }
     t = now();
     currentRMS = getCurrent();
-    power = 225 * currentRMS; // Calibrated for my house
+    power = 230 * currentRMS; // Calibrated for my house
 
     #if DEBUGGING
     rdebugA("%s: Current is: %fA, which makes power: %fW\n", NTP.getTimeDateString().c_str(), currentRMS, power);

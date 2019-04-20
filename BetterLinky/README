@@ -1,0 +1,55 @@
+How to make your own energy smart reader, which will give you data more often than commercial ones
+
+WARNING: This solution has a serious flaw, which is not addressed for a reason. We do NOT measure voltage. Only amperage.
+Anyone familiar with Ohm's law will know that you need both those values to make a result in watts.
+Since measuring voltage would require to connect the 230V live wires to a microcontroller, I did not do this.
+Safety is a main concern for this. The users can be anyone, without electricity safety training. You only need to turn off your main
+house breaker for the clamp installation.
+Don't touch anything shiny in your electrical panel and you'll be fine.
+
+The values calculated are an approximation, based on a calibrated voltage value for your deployment site. You can use a multimeter
+to check the voltage, just jam the two pointy bits into an electrical socket and read the voltage. You need to check the value
+at different times of the day, since it can fluctuate.
+My favourite is a mini voltmeter you can directly plug into the wall. https://www.aliexpress.com/item/1PC-LCD-Digital-Voltmeter-Volt-Monitor-AC-110V-220V-Household-AC-Panel-Meter-Euro-EU-Plug/32791156940.html?spm=a2g0s.9042311.0.0.27424c4dhoHruE
+You just need to check it a bit and make an average you find correct. And you'll need to keep in mind that the wattage you obtain can be partially (a few percents) off.
+
+The first part of the project is buying the components. Here is all the specific things:
+
+* Some kind of ESP8266 or Arduino with Wifi compatible device. My favourite: https://www.aliexpress.com/item/WAVGAT-NodeMCU-V3-Lua-WIFI-module-integration-of-ESP8266-extra-memory-32M-flash-USB-serial-CH340G/32842018968.html?spm=a2g0s.9042311.0.0.27424c4diImtas
+* An analog to digital converter. You need this to avoid building a voltage divider (clamp output is alternating current)
+https://www.aliexpress.com/item/I2C-ADS1115-16-Bit-ADC-4-channel-Module-with-Programmable-Gain-Amplifier-2-0V-to-5/32673301320.html?spm=a2g0s.9042311.0.0.27424c4diImtas
+* A current clamp. YOU NEED TO TAKE ONE THAT WILL MATCH THE MAX AMPERAGE YOU WILL SEE. I use one that does 1V=30A. https://www.aliexpress.com/item/30A-SCT-013-030-Non-invasive-AC-current-sensor-Split-Core-Current-Transformer-SCT-013/32792758653.html?spm=a2g0s.9042311.0.0.27424c4diImtas
+The same item exists for different maximum amperage. The lower the amperage, the more precision you will get. If you are going too low, you'll burn the ADC board.
+* A breadboard
+* Some female pin headers
+* Some wire
+* Connector terminals for your breadboard
+* Any DC power brick, from 5V to 12V
+
+
+Take the clamp, put it around the live wire going from your main breaker. Or any live wire you need to monitor.
+Cut the end of the cable, to remove the 3.5mm jack connector. We don't need it. Strip a bit of the wire to expose the two internal wires.
+Strip a bit of the two internal wires to have them ready.
+
+Cut your female pin headers so the microcontroller can fit in them. Solder them into the breadboard. We do this so we can remove the microcontroller quickly if needed
+Solder the connector terminals to the edges of the breadboard. You need two times two.
+Wire the two pins VIN and GND to their connector terminal you want. Those will be the ones you will need to use to power the uC.
+Take your power brick, cut the connector, strip wires and plug the positive into the block connector for VIN, and negative to GND. If in doubt, use a multimeter to check polarity.
+Cut a bit of the female pin headers for the ADC. Solder and wire the ADC to the uC. I don't remember the pinout.
+Connect A0 of the ADC into one of the two wires from the clamp (that you connected to the block terminals)
+Connect A1 of the ADC into the other one.
+
+Take your uC, and depending on which it is, upload the code (and modify it if needed) to it. You will need to create a secrets.h file with your WiFi information
+If you read the code, you will already have realised that you need to hardcode both your calibrated voltage and server's IP into the code.
+If not, do that.
+
+On your server, do nc -l -k -w 5 4200 (or another port if you want) | tee -a log.txt
+This will open a socket, listen there and print the output and send it to the log.txt file.
+
+Then install gnuplot, and run gnuplot linky.plot > image.png
+
+And you are done!
+You can debug the uC by doing nc IPHERE 23
+A telnet session will be open, and you will get the read data, with error messages if any from the uC.
+
+Good luck

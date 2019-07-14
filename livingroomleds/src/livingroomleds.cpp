@@ -54,7 +54,7 @@ void handleIndexGet() {
     memset(bufferHtml, 0, sizeof(htmlTemplate) + 42);
     memset(bufferCss, 0, sizeof(htmlTemplateCSS));
     strcpy_P(bufferCss, htmlTemplateCSS);
-    sprintf_P(bufferHtml, htmlTemplate, bufferCss, savedConf.red, savedConf.green, savedConf.blue, savedConf.brightness);
+    sprintf_P(bufferHtml, htmlTemplate, bufferCss, savedConf.red, savedConf.green, savedConf.blue, savedConf.brightness, NTP.getTimeDateString().c_str());
     server.send(200, "text/html", bufferHtml);
     free(bufferHtml);
     free(bufferCss);
@@ -162,6 +162,15 @@ void loop() {
     }
 
     time_t t = now();
+
+    if (year() != 2019 && year() != 2020) {
+        rgb(&loopConf, 255, 0, 0);
+        loopConf.brightness = 255;
+        toUpdate = true;
+        NTP.begin("europe.pool.ntp.org", 1, true, 0);
+        goto end; // Hehe, fight me
+    }
+
     if (hour(t) == 23 && minute(t) == 0 && second(t) == 0) { // 23h, set as full red, warning
         rgb(&loopConf, 255, 0, 0);
         loopConf.brightness = 255;
@@ -201,6 +210,7 @@ void loop() {
         FastLED.setBrightness(modifiedBrightness);
     }
 
+end:
     if (toUpdate && !loopConf.rainbow) {
         fill_solid(leds, NUM_LEDS, CRGB(loopConf.red, loopConf.green, loopConf.blue));
     }

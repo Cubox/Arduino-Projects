@@ -30,8 +30,7 @@ void setup() {
     WiFi.begin(SSID, PASSWORD); // Hint: secrets.h
     // Without WiFi being up, we are useless. Kill ourselves until it works.
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        delay(1000);
-        ESP.restart();
+        delay(100);
     }
 
     ArduinoOTA.begin();
@@ -88,6 +87,7 @@ void loop() {
         client.printf("%ld %f %f\n", t, currentRMS, power);
     // If despite the previous connect attempt, we are still not connected, well, fuck.
     } else { 
+        client.connect("192.168.0.252", 4200);
         #if DEBUGGING
         rdebugAln("Despite trying to reconnect, no luck");
         #endif

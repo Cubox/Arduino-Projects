@@ -1,6 +1,0 @@
-{
-    "terminal.integrated.env.windows": {
-        "PATH": "C:\\Users\\cubox\\.platformio\\penv\\Scripts;C:\\Users\\cubox\\.platformio\\penv;C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath;c:\\windows\\system32;c:\\windows;c:\\windows\\system32\\wbem;c:\\windows\\system32\\windowspowershell\\v1.0\\;c:\\windows\\system32\\openssh\\;c:\\program files\\git\\cmd;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\root\\Go\\bin;C:\\Users\\cubox\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Users\\cubox\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\cubox\\go\\bin;C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath;c:\\windows\\system32;c:\\windows;c:\\windows\\system32\\wbem;c:\\windows\\system32\\windowspowershell\\v1.0\\;c:\\windows\\system32\\openssh\\;c:\\program files\\git\\cmd;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\root\\Go\\bin;C:\\Users\\cubox\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Users\\cubox\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\cubox\\go\\bin",
-        "PLATFORMIO_CALLER": "vscode"
-    }
-}

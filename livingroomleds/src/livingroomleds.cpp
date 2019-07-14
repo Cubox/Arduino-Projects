@@ -105,8 +105,7 @@ void setup() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        delay(1000);
-        ESP.restart();
+        delay(100);
     }
 
     EEPROM.get(0, savedConf);

@@ -1,2 +1,5 @@
 desktop.ini
 .vscode/
+thermocouple/include/secrets1.h
+thermocouple/include/secrets2.h
+thermocouple/include/secrets3.h

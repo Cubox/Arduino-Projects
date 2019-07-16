@@ -99,7 +99,6 @@ void printVoltage(Task *me) {
     if (voltage < 16) { // To prevent relay loop, we stay LOW and ignore all overrides
         setState(LOW);  // if we are not on battery, which cuts off at 18V
         overrideState = NORMAL;
-        return;
     }
 
     Serial.println(voltage);

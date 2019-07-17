@@ -12,6 +12,7 @@
 #endif
 #define CURRENT_YEAR 2019
 
+// the offsets serve as calibration for the probes.
 #if PORT == 4201
     #define OFFSET -0.99
     #include "secrets1.h"
@@ -28,8 +29,9 @@
 WiFiClient client;
 MAX6675 thermocouple;
 
-unsigned long sendDataLoop;
-
+// signal that there is a problem
+// The number of flashes are not reliable to determine origin of fail
+// Mainly a cry for help directed at the user
 void flashLed(unsigned char times) {
     for (unsigned char i = 0; i < times; i++) {
         digitalWrite(LED_BUILTIN, LOW);
@@ -39,39 +41,53 @@ void flashLed(unsigned char times) {
     }
 }
 
+void handleNotConnectedWifi(unsigned int *i) {
+    if (*i >= 100) {
+        ESP.restart();
+    }
+    flashLed(2);
+    delay(200);
+    (*i)++;
+}
+
+unsigned long sentDataLast;
+unsigned long readProbeLast;
+
 void setup() {
+    // the LED on the ESP are inverted from Arduinos. HIGH for OFF, LOW for ON
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
 
     thermocouple.begin(D5, D6, D7);
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(SSID, PASSWORD); // Hint: secrets.h
-    // Without WiFi being up, we are useless. Kill ourselves until it works.
+    // SSID and passwords are stored under the secretsx.h header.
+    // we need to add the include dir to .gitignore
+    WiFi.begin(SSID, PASSWORD);
+    // Without WiFi being up, we are useless. Restart the ESP after ~60s
     unsigned int i = 0;
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        if (i >= 100) {
-            ESP.restart();
-        }
-        flashLed(2);
-        // delay(100);
-        i++;
+        handleNotConnectedWifi(&i);
     }
 
     ArduinoOTA.begin();
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
-    client.setNoDelay(true);
-    // This is a local server running netcat -l -k -w 5 4201 | tee log
+    client.setNoDelay(true); // don't bunch up the packets
+    client.setSync(true); // wait until the data is received before continue
+    // This is a local server running netcat -l -k -w 5 PORT | tee log
     client.connect(SERVER, PORT);
 
-    sendDataLoop = millis();
+    sentDataLast = millis();
+    readProbeLast = 0; // we need an immediate reading
 }
 
 double temperature = 0;
-double i = 0;
+unsigned int temperatureCount = 0;
+unsigned int disconnectedCount = 0;
 
 void loop() {
-    double reading;
+    ArduinoOTA.handle();
+
     // Either we have no time, or it's wrong. This need to be updated in a year.
     // Don't forget to update this!
     // We are not reporting without the proper time
@@ -80,36 +96,54 @@ void loop() {
     if (year() != CURRENT_YEAR && year() != CURRENT_YEAR + 1) {
         flashLed(5);
         NTP.begin("europe.pool.ntp.org", 1, true, 0);
-        goto end; // Hehe, fight me
+        return;
     }
 
-    if (!client.connected()) {
+    // if we lost the TCP server
+    if (client.connected() == false) {
         client.connect(SERVER, PORT);
     }
 
-    delay(250);
-    reading = thermocouple.readCelsius();
-    if (reading < 20) {
-        client.printf("\n");
-        flashLed(10);
-        goto end;
-    }
-    temperature += reading;
-    i++;
+    double reading;
+    if (millis() - readProbeLast >= 250) {
+        reading = thermocouple.readCelsius();
+        readProbeLast = millis();
 
-    if (millis() - sendDataLoop >= 25000) {
-        if (client.connected()) {
-            // If you need a specific output format, this is where you set it up
-            client.printf("%ld %.3f\n", now(), (temperature / i) + OFFSET);
-            // If despite the previous connect attempt, we are still not connected, we try to connect again
-        } else {
-            client.connect(SERVER, PORT);
+        if (reading < 20) {
+            // Wrong readings can occur depending on physical placement of probe
+            // Source of interference not found yet
+            // However, since wrong readings were under 20°C, we can ignore those
+            // For winter, we need to lower the threshold
+            client.printf("#Incorrect reading: %.3f\n", reading);
+            flashLed(10);
+            return;
         }
-        i = 0;
-        temperature = 0;
-        sendDataLoop = millis();
-    } 
 
-end:
-    ArduinoOTA.handle();
+        temperature += reading;
+        temperatureCount++;
+    }
+
+    if (millis() - sentDataLast >= 25000) {
+        if (client.connected() && WiFi.isConnected()) {
+            client.printf("%ld %.3f\n", now(), (temperature / temperatureCount) + OFFSET);
+            // We only update sentDataLast if we sent the data
+            // If we were unable to send data, we should not wait another 20s
+            // (see else block under here)
+            sentDataLast = millis();
+            disconnectedCount = 0;
+        } else {
+            // after 100 tries (minimum of 1s of delay due to flashLed)
+            // we need to restart the ESP, just in case
+            // counter is reset each successful send
+            if (disconnectedCount >= 100) {
+                flashLed(5);
+                ESP.restart();
+            }
+            disconnectedCount++;
+            flashLed(5);
+        }
+
+        temperatureCount = 0;
+        temperature = 0;
+    }
 }

@@ -140,7 +140,7 @@ void loop() {
                 ESP.restart();
             }
             disconnectedCount++;
-            flashLed(5);
+            flashLed(2);
         }
 
         temperatureCount = 0;

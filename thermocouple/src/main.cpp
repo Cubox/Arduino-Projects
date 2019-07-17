@@ -104,9 +104,8 @@ void loop() {
         client.connect(SERVER, PORT);
     }
 
-    double reading;
     if (millis() - readProbeLast >= 250) {
-        reading = thermocouple.readCelsius();
+        double reading = thermocouple.readCelsius();
         readProbeLast = millis();
 
         if (reading < 20) {

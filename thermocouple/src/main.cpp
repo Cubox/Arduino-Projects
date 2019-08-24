@@ -4,7 +4,6 @@
 #include <TimeLib.h>
 #include <NTPClientLib.h>
 #include <WiFiClient.h>
-#include <max6675.h>
 
 #define SERVER "192.168.0.252"
 #ifndef PORT
@@ -14,20 +13,44 @@
 
 // the offsets serve as calibration for the probes.
 #if PORT == 4201
-    #define OFFSET -0.99
+    #define PROBEOFFSET -0.99
+    #define KPROBE
     #include "secrets1.h"
 #elif PORT == 4202
-    #define OFFSET -0.79
+    #define PROBEOFFSET -0.79
+    #define KPROBE
     #include "secrets2.h"
 #elif PORT == 4203
-    #define OFFSET -0.85
+    #define PROBEOFFSET -0.85
+    #define KPROBE
     #include "secrets3.h"
+#elif PORT == 4204
+    #define PROBEOFFSET 0
+    #define DS18B20
+    #include "secrets4.h"
+#elif PORT == 4205
+    #define PROBEOFFSET 0
+    #define DS18B20
+    #include "secrets5.h"
 #else
     #error Welp
 #endif
 
+#if defined(KPROBE)
+    #include <max6675.h>
+    MAX6675 thermocouple;
+    #define TIMEBETWEENREADS 250
+#elif defined(DS18B20)
+    #include <OneWire.h>
+    #include <DallasTemperature.h>
+    #define ONE_WIRE_BUS D4
+    #define TIMEBETWEENREADS 750
+    OneWire oneWire(ONE_WIRE_BUS);
+    DallasTemperature sensors(&oneWire);
+#endif
+
 WiFiClient client;
-MAX6675 thermocouple;
+
 
 // signal that there is a problem
 // The number of flashes are not reliable to determine origin of fail
@@ -58,7 +81,13 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
 
+    #if defined(KPROBE)
     thermocouple.begin(D5, D6, D7);
+    #elif defined(DS18B20)
+    sensors.begin();
+    sensors.setResolution(12);
+    sensors.requestTemperatures();
+    #endif
 
     WiFi.mode(WIFI_STA);
     // SSID and passwords are stored under the secretsx.h header.
@@ -104,8 +133,13 @@ void loop() {
         client.connect(SERVER, PORT);
     }
 
-    if (millis() - readProbeLast >= 250) {
+    if (millis() - readProbeLast >= TIMEBETWEENREADS) {
+        #if defined(KPROBE)
         double reading = thermocouple.readCelsius();
+        #elif defined(DS18B20)
+        double reading = sensors.getTempCByIndex(0);
+        sensors.requestTemperatures();
+        #endif
         readProbeLast = millis();
 
         if (reading < 20) {
@@ -122,9 +156,9 @@ void loop() {
         temperatureCount++;
     }
 
-    if (millis() - sentDataLast >= 25000) {
+    if (millis() - sentDataLast >= 10000) {
         if (client.connected() && WiFi.isConnected()) {
-            client.printf("%ld %.3f\n", now(), (temperature / temperatureCount) + OFFSET);
+            client.printf("%ld %.3f\n", now(), (temperature / temperatureCount) + PROBEOFFSET);
             // We only update sentDataLast if we sent the data
             // If we were unable to send data, we should not wait another 20s
             // (see else block under here)

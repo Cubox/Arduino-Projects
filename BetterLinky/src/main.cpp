@@ -8,13 +8,6 @@
 #include <WiFiClient.h>
 #include "secrets.h"
 
-#define DEBUGGING true
-
-#if DEBUGGING
-#include <RemoteDebug.h>
-RemoteDebug Debug;
-#endif
-
 Adafruit_ADS1115 ads;
 
 // Nicked this from somewhere, don't know don't ask
@@ -24,26 +17,45 @@ const double FACTOR = 30;
 
 WiFiClient client;
 
+void flashLed(unsigned char times) {
+    for (unsigned char i = 0; i < times; i++) {
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(100);
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(100);
+    }
+}
+
+void handleNotConnectedWifi(unsigned int *i) {
+    if (*i >= 100) {
+        ESP.restart();
+    }
+    flashLed(2);
+    delay(200);
+    (*i)++;
+}
+
 void setup() {
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH);
+
     Wire.begin(D4, D5); // Change if you wired things differently.
     WiFi.mode(WIFI_STA);
     WiFi.begin(SSID, PASSWORD); // Hint: secrets.h
     // Without WiFi being up, we are useless. Kill ourselves until it works.
+    unsigned int i = 0;
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        delay(100);
+        handleNotConnectedWifi(&i);
     }
 
     ArduinoOTA.begin();
-    #if DEBUGGING
-    Debug.begin("linky.cubox");
-    Debug.setResetCmdEnabled(true);
-    #endif
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
     // Since the max voltage the ADC will see is 1.42, we can double it
     // To gain more precision. If you change this, maybe update hardcoded values?
     ads.setGain(GAIN_TWO);
     ads.begin();
     client.setNoDelay(true);
+    client.setSync(true);
     // This is a local server running netcat -l -k -w 5 4200 | tee log
     client.connect("192.168.0.252", 4200);
 }
@@ -54,33 +66,25 @@ double getCurrent();
 // A full loop should happen once per second, plus a liiiiittle bit each time
 // Might be more if we are trying to reconnect to the server, or if NTP needs 
 void loop() { 
-    double currentRMS;
-    double power;
-    time_t t; // Need to declare here of the goto won't work
+    ArduinoOTA.handle();
 
     // Either we have no time, or it's wrong. This need to be updated in a year.
     // Don't forget to update this!
     // We are not reporting power use without the proper time
     // But still need to call "end of loop" functions
     // (Also will be more obvious if there is a time problem, no output)
-    if (year() != 2019 && year() != 2020) { 
+    if (year() != 2019 && year() != 2020) {
+        flashLed(5);
         NTP.begin("europe.pool.ntp.org", 1, true, 0);
-        goto end; // Hehe, fight me
+        return;
     }
 
     if (!client.connected()) {
-        #if DEBUGGING
-        rdebugAln("We are disconnected. Reconnecting");
-        #endif
         client.connect("192.168.0.252", 4200);
     }
-    t = now();
-    currentRMS = getCurrent();
-    power = 230 * currentRMS; // Calibrated for my house
-
-    #if DEBUGGING
-    rdebugA("%s: Current is: %fA, which makes power: %fW\n", NTP.getTimeDateString().c_str(), currentRMS, power);
-    #endif
+    time_t t = now();
+    double currentRMS = getCurrent();
+    double power = 230 * currentRMS; // Calibrated for my house
     
     if (client.connected()) {
         // If you need a specific output format, this is where you set it up
@@ -88,16 +92,7 @@ void loop() {
     // If despite the previous connect attempt, we are still not connected, well, fuck.
     } else { 
         client.connect("192.168.0.252", 4200);
-        #if DEBUGGING
-        rdebugAln("Despite trying to reconnect, no luck");
-        #endif
     }
-
-end:
-    ArduinoOTA.handle();
-    #if DEBUGGING
-    Debug.handle();
-    #endif
 }
 
 // Got this from some website, not made by me
@@ -112,10 +107,6 @@ double getCurrent() {
         voltage = ads.readADC_Differential_0_1() * multiplier;
         current = voltage * FACTOR;
         current /= 1000.0;
-
-        // #if DEBUGGING
-        // rdebugAln("%f", current);
-        // #endif
 
         sum += sq(current);
         counter++;

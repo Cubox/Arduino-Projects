@@ -11,27 +11,36 @@
 #endif
 #define CURRENT_YEAR 2019
 
+#define CALIBRATING true
+#if CALIBRATING
+    #include "secrets1.h"
+#endif
+
 // the offsets serve as calibration for the probes.
 #if PORT == 4201
-    #define PROBEOFFSET -0.99
-    #define KPROBE
+    #define PROBEOFFSET 0.63
+    #define DS18B20
     #include "secrets1.h"
 #elif PORT == 4202
-    #define PROBEOFFSET -0.79
+    #define PROBEOFFSET -0.56
     #define KPROBE
     #include "secrets2.h"
 #elif PORT == 4203
-    #define PROBEOFFSET -0.85
-    #define KPROBE
+    #define PROBEOFFSET 1.17
+    #define DS18B20
     #include "secrets3.h"
 #elif PORT == 4204
-    #define PROBEOFFSET 0
+    #define PROBEOFFSET 1.00
     #define DS18B20
     #include "secrets4.h"
 #elif PORT == 4205
-    #define PROBEOFFSET 0
+    #define PROBEOFFSET 1.35
     #define DS18B20
     #include "secrets5.h"
+#elif PORT == 4206
+    #define PROBEOFFSET 1.04
+    #define DS18B20
+    #include "secrets6.h"
 #else
     #error Welp
 #endif
@@ -43,8 +52,8 @@
 #elif defined(DS18B20)
     #include <OneWire.h>
     #include <DallasTemperature.h>
-    #define ONE_WIRE_BUS D4
-    #define TIMEBETWEENREADS 750
+    #define ONE_WIRE_BUS D3
+    #define TIMEBETWEENREADS 1000
     OneWire oneWire(ONE_WIRE_BUS);
     DallasTemperature sensors(&oneWire);
 #endif
@@ -73,8 +82,9 @@ void handleNotConnectedWifi(unsigned int *i) {
     (*i)++;
 }
 
-unsigned long sentDataLast;
-unsigned long readProbeLast;
+unsigned long sentDataLast, readProbeLast;
+double temperature;
+unsigned int temperatureCount, disconnectedCount;
 
 void setup() {
     // the LED on the ESP are inverted from Arduinos. HIGH for OFF, LOW for ON
@@ -82,11 +92,10 @@ void setup() {
     digitalWrite(LED_BUILTIN, HIGH);
 
     #if defined(KPROBE)
-    thermocouple.begin(D5, D6, D7);
+        thermocouple.begin(D5, D6, D7);
     #elif defined(DS18B20)
-    sensors.begin();
-    sensors.setResolution(12);
-    sensors.requestTemperatures();
+        sensors.begin();
+        sensors.setResolution(12);
     #endif
 
     WiFi.mode(WIFI_STA);
@@ -100,6 +109,10 @@ void setup() {
     }
 
     ArduinoOTA.begin();
+    ArduinoOTA.onError([](ota_error_t error) {
+        ESP.restart();
+    });
+    
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
     client.setNoDelay(true); // don't bunch up the packets
     client.setSync(true); // wait until the data is received before continue
@@ -108,11 +121,11 @@ void setup() {
 
     sentDataLast = millis();
     readProbeLast = 0; // we need an immediate reading
-}
 
-double temperature = 0;
-unsigned int temperatureCount = 0;
-unsigned int disconnectedCount = 0;
+    temperature = 0;
+    temperatureCount = 0;
+    disconnectedCount = 0;
+}
 
 void loop() {
     ArduinoOTA.handle();
@@ -135,18 +148,14 @@ void loop() {
 
     if (millis() - readProbeLast >= TIMEBETWEENREADS) {
         #if defined(KPROBE)
-        double reading = thermocouple.readCelsius();
+            double reading = thermocouple.readCelsius();
         #elif defined(DS18B20)
-        double reading = sensors.getTempCByIndex(0);
-        sensors.requestTemperatures();
+            sensors.requestTemperaturesByIndex(0);
+            double reading = sensors.getTempCByIndex(0);
         #endif
         readProbeLast = millis();
 
-        if (reading < 20) {
-            // Wrong readings can occur depending on physical placement of probe
-            // Source of interference not found yet
-            // However, since wrong readings were under 20°C, we can ignore those
-            // For winter, we need to lower the threshold
+        if (reading < 0 || isnan(reading)) {
             client.printf("#Incorrect reading: %.3f\n", reading);
             flashLed(10);
             return;
@@ -156,8 +165,8 @@ void loop() {
         temperatureCount++;
     }
 
-    if (millis() - sentDataLast >= 10000) {
-        if (client.connected() && WiFi.isConnected()) {
+    if (millis() - sentDataLast >= 25000) {
+        if (client.connected() && WiFi.isConnected() && !isnan(temperature) && !isnan(temperature/temperatureCount)) {
             client.printf("%ld %.3f\n", now(), (temperature / temperatureCount) + PROBEOFFSET);
             // We only update sentDataLast if we sent the data
             // If we were unable to send data, we should not wait another 20s

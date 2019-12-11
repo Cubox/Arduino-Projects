@@ -11,34 +11,36 @@
 #endif
 #define CURRENT_YEAR 2019
 
-#define CALIBRATING true
+#define CALIBRATING false
 #if CALIBRATING
     #include "secrets1.h"
 #endif
 
+#define GLOBALOFFSET 0.355
+
 // the offsets serve as calibration for the probes.
 #if PORT == 4201
-    #define PROBEOFFSET 0.63
+    #define PROBEOFFSET GLOBALOFFSET // Always zero, since this is the reference
     #define DS18B20
     #include "secrets1.h"
 #elif PORT == 4202
-    #define PROBEOFFSET -0.56
+    #define PROBEOFFSET -1.19+GLOBALOFFSET
     #define KPROBE
     #include "secrets2.h"
 #elif PORT == 4203
-    #define PROBEOFFSET 1.17
+    #define PROBEOFFSET 0.54+GLOBALOFFSET
     #define DS18B20
     #include "secrets3.h"
 #elif PORT == 4204
-    #define PROBEOFFSET 1.00
+    #define PROBEOFFSET 0.37+GLOBALOFFSET
     #define DS18B20
     #include "secrets4.h"
 #elif PORT == 4205
-    #define PROBEOFFSET 1.35
+    #define PROBEOFFSET 0.72+GLOBALOFFSET
     #define DS18B20
     #include "secrets5.h"
 #elif PORT == 4206
-    #define PROBEOFFSET 1.04
+    #define PROBEOFFSET 0.41+GLOBALOFFSET
     #define DS18B20
     #include "secrets6.h"
 #else
@@ -165,8 +167,8 @@ void loop() {
         temperatureCount++;
     }
 
-    if (millis() - sentDataLast >= 25000) {
-        if (client.connected() && WiFi.isConnected() && !isnan(temperature) && !isnan(temperature/temperatureCount)) {
+    if (millis() - sentDataLast >= 25000 && temperatureCount > 0 && !isnan(temperature)) {
+        if (client.connected() && WiFi.isConnected()) {
             client.printf("%ld %.3f\n", now(), (temperature / temperatureCount) + PROBEOFFSET);
             // We only update sentDataLast if we sent the data
             // If we were unable to send data, we should not wait another 20s

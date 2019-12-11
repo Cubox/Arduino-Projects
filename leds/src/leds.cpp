@@ -2,10 +2,10 @@
 #include <FastLED.h>
 #include <EEPROM.h>
 
-#define RIGHTLED 30
-#define RIGHTPIN 8
-#define LEFTPIN 6
-#define LEFTLED 28
+#define RIGHTLED 35
+#define RIGHTPIN 6
+#define LEFTPIN 8
+#define LEFTLED 35
 
 CRGB right[RIGHTLED];
 CRGB left[LEFTLED];
@@ -24,6 +24,7 @@ enum modes {
 
 enum modes mode = OFF;
 char globalBrightness = 150;
+bool toUpdate = false;
 
 void setup() {
   Serial.begin(9600);
@@ -39,8 +40,9 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   
-  currentPalette = PartyColors_p;
+  currentPalette = RainbowColors_p;
   currentBlending = LINEARBLEND;
+  toUpdate = true;
 }
 
 void FillLEDsFromPaletteColors(uint8_t colorIndex, CRGB *strip, uint8_t len)
@@ -84,52 +86,56 @@ void serialEvent() {
     }
     EEPROM.update(0, mode);
     EEPROM.update(1, globalBrightness);
+    toUpdate = true;
   }
 }
 
 void loop() {
   float breath;
   float bright;
-  switch (mode) {
-    case OFF: FastLED.setBrightness(0); break; // off
-    case ON: // normal use (supposed to be 255,152,54 without correction)
-        FastLED.setBrightness(globalBrightness);
-        fill_solid(right, RIGHTLED, CRGB(255,223,69));
-        fill_solid(left, LEFTLED, CRGB(255,223,69));
-        break;
-    case RAINBOW: // rainbow
-        FastLED.setBrightness(255);
-        static uint8_t startIndex = 0;
-        startIndex = startIndex + 1; /* motion speed */
-    
-        FillLEDsFromPaletteColors(startIndex, right, RIGHTLED);
-        FillLEDsFromPaletteColors(startIndex, left, LEFTLED);
-        break;
-     case BORANGE: // orange breathing
-        FastLED.setBrightness(globalBrightness);
-        fill_solid(right, RIGHTLED, CRGB(255,30,0));
-        fill_solid(left, LEFTLED, CRGB(255,30,0));
-        breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-        bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
-        FastLED.setBrightness(bright);
-        break;
-     case BBLUE: // blue breathing
-        FastLED.setBrightness(globalBrightness);
-        fill_solid(right, RIGHTLED, CRGB::Blue);
-        fill_solid(left, LEFTLED, CRGB::Blue);
-        breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-        bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
-        FastLED.setBrightness(bright);
-        break;
-     case TEST1: // testing
-        FastLED.setBrightness(globalBrightness);
-        fill_solid(right, RIGHTLED, CRGB::Blue);
-        fill_solid(left, LEFTLED, CRGB::Blue);
-        breath = (exp(sin(millis()/5000.0*PI))-0.36787944)*308.0;
-        bright = map(breath, 0, 255, 0, 20); // min breath, max breath, min brightness, max brightness
-        FastLED.setBrightness(bright);
-        break;
-   }
+  if (toUpdate) {
+    switch (mode) {
+      case OFF: FastLED.setBrightness(0); toUpdate = false; break; // off
+      case ON: // normal use (supposed to be 255,152,54 without correction)
+          FastLED.setBrightness(globalBrightness);
+          fill_solid(right, RIGHTLED, CRGB(255,223,69));
+          fill_solid(left, LEFTLED, CRGB(255,223,69));
+          toUpdate = false;
+          break;
+      case RAINBOW: // rainbow
+          FastLED.setBrightness(255);
+          static uint8_t startIndex = 0;
+          startIndex = startIndex + 1; /* motion speed */
+
+          FillLEDsFromPaletteColors(startIndex, right, RIGHTLED);
+          FillLEDsFromPaletteColors(startIndex, left, LEFTLED);
+          break;
+       case BORANGE: // orange breathing
+          FastLED.setBrightness(globalBrightness);
+          fill_solid(right, RIGHTLED, CRGB(255,30,0));
+          fill_solid(left, LEFTLED, CRGB(255,30,0));
+          breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
+          bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
+          FastLED.setBrightness(bright);
+          break;
+       case BBLUE: // blue breathing
+          FastLED.setBrightness(globalBrightness);
+          fill_solid(right, RIGHTLED, CRGB::Blue);
+          fill_solid(left, LEFTLED, CRGB::Blue);
+          breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
+          bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
+          FastLED.setBrightness(bright);
+          break;
+       case TEST1: // testing
+          FastLED.setBrightness(globalBrightness);
+          fill_solid(right, RIGHTLED, CRGB::Blue);
+          fill_solid(left, LEFTLED, CRGB::Blue);
+          breath = (exp(sin(millis()/5000.0*PI))-0.36787944)*308.0;
+          bright = map(breath, 0, 255, 0, 20); // min breath, max breath, min brightness, max brightness
+          FastLED.setBrightness(bright);
+          break;
+    }
+  }
   FastLED.show();
   //delay(1000);
 }

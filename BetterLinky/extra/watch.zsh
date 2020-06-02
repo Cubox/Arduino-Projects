@@ -13,13 +13,20 @@ while true; do
     cd ../
     rm -rf log-output/
 
-    ./separate.zsh solarlog
+    ./separatesolar.zsh solarlog
     cd solarlog-output/
     for i in *.txt; do
-        gnuplot -e "filename='$i'" ../solar.plot > $(basename $i .txt).png
+        # We need to pass the offset to gnuplot later. This is to fix dst
+        firstTimeStamp=$(date -r $(head -n 1 $i | cut -d " " -f 1) +%s)
+        if [[ $(date -r $firstTimeStamp -v +6H +%z) == "+0100" ]];then
+            offset="3600"
+        elif [[ $(date -r $firstTimeStamp -v +6H +%z) == "+0200" ]];then
+            offset="7200"
+        fi
+        gnuplot -e "filename='$i'" -e "offset=$offset" ../solar.plot > $(basename $i .txt).png
         scp ./$(basename $i .txt).png cubox@cubox.dev:/www/cubox/graphs/solar/
     done
     cd ../
     rm -rf solarlog-output/
-    sleep 3600
+    sleep 600
 done

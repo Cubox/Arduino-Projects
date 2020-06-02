@@ -23,16 +23,10 @@ mkdir "$1"-output
 while true; do
     # Use $beginning and add i days to it. Use that for the filename
     outfile="$1"-output/$(date -r $beginning -v +"$i"d "+%Y-%m-%dT%H:%M:%S").txt
-    # Get the DST value for that day
-    if [[ $(date -r $beginning -v +"$i"d -v +6H +%z) == "+0100" ]];then
-        offset="+1H"
-    elif [[ $(date -r $beginning -v +"$i"d -v +6H +%z) == "+0200" ]];then
-        offset="+2H"
-    fi
     # Now, we pass the timestamp of that day (midnight) as date. 
-    date=$(date -r $beginning -v +"$i"d -v $offset "+%s")
+    date=$(date -r $beginning -v +"$i"d "+%s")
     # enddate is the same with a day added
-    enddate=$(date -r $beginning -v +"$i"d -v $offset -v +1d "+%s")
+    enddate=$(date -r $beginning -v +"$i"d -v +1d "+%s")
     # Use awk to filter out any lines where the timestamp is between date and enddate
     awk -v date=$date -v enddate=$enddate '{if ($1 >= date && $1 < enddate) print $0;}' $1 > $outfile
     if [ ! -s ${outfile} ]; then

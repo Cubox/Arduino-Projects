@@ -38,12 +38,12 @@ yornothing(x,y) = (shift(x), abs(x-previous)<600?y:sqrt(0/0))
 
 plot \
     log1 \
-    using ($1 + 7200):(yornothing($1,$2)) w lines ls 1 title "Chambre Andy", \
+    using ($1):(yornothing($1,$2)) w lines ls 1 title "Chambre Andy", \
     log3 \
-    using ($1 + 7200):(yornothing($1,$2)) w lines ls 3 title "Salon", \
+    using ($1):(yornothing($1,$2)) w lines ls 3 title "Salon", \
     log4 \
-    using ($1 + 7200):(yornothing($1,$2)) w lines ls 4 title "Chambre Mina", \
+    using ($1):(yornothing($1,$2)) w lines ls 4 title "Chambre Mina", \
     log5 \
-    using ($1 + 7200):(yornothing($1,$2)) w lines ls 5 title "Couloir", \
+    using ($1):(yornothing($1,$2)) w lines ls 5 title "Couloir", \
     log6 \
-    using ($1 + 7200):(yornothing($1,$2)) w lines ls 6 title "Salle de bain" \
+    using ($1):(yornothing($1,$2)) w lines ls 6 title "Salle de bain" \

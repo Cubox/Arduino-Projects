@@ -31,7 +31,7 @@ func main() {
 	serial, err := term.Open("/dev/cuaU0", term.Speed(57600), term.RawMode)
 	
 	if err != nil {
-		serial, err = term.Open("/dev/cuaU1", term.Speed(57600), term.RawMode)
+		serial, err = term.Open("/dev/cuau1", term.Speed(57600), term.RawMode)
 	}
 	if err != nil {
 		panic(err)

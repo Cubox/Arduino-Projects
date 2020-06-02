@@ -2,10 +2,10 @@
 #include <FastLED.h>
 #include <EEPROM.h>
 
-#define RIGHTLED 35
+#define RIGHTLED 33
 #define RIGHTPIN 6
 #define LEFTPIN 8
-#define LEFTLED 35
+#define LEFTLED 33
 
 CRGB right[RIGHTLED];
 CRGB left[LEFTLED];
@@ -18,8 +18,7 @@ enum modes {
   ON,
   RAINBOW,
   BORANGE,
-  BBLUE,
-  TEST1
+  BBLUE
 };
 
 enum modes mode = OFF;
@@ -72,8 +71,6 @@ void serialEvent() {
       mode = BORANGE;
     } else if (strcmp(buf, "BB") == 0) {
       mode = BBLUE;
-    } else if (strcmp(buf, "T") == 0) {
-      mode = TEST1;
     } else if ((buf2 = strstr(buf, "Br: ")) != NULL) {
       buf2 += 4;
       int received = atoi(buf2);
@@ -90,6 +87,8 @@ void serialEvent() {
   }
 }
 
+uint8_t startIndex = 0;
+
 void loop() {
   float breath;
   float bright;
@@ -104,11 +103,11 @@ void loop() {
           break;
       case RAINBOW: // rainbow
           FastLED.setBrightness(255);
-          static uint8_t startIndex = 0;
-          startIndex = startIndex + 1; /* motion speed */
+          startIndex++; /* motion speed */
 
           FillLEDsFromPaletteColors(startIndex, right, RIGHTLED);
           FillLEDsFromPaletteColors(startIndex, left, LEFTLED);
+          delay(5);
           break;
        case BORANGE: // orange breathing
           FastLED.setBrightness(globalBrightness);
@@ -124,14 +123,6 @@ void loop() {
           fill_solid(left, LEFTLED, CRGB::Blue);
           breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
           bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
-          FastLED.setBrightness(bright);
-          break;
-       case TEST1: // testing
-          FastLED.setBrightness(globalBrightness);
-          fill_solid(right, RIGHTLED, CRGB::Blue);
-          fill_solid(left, LEFTLED, CRGB::Blue);
-          breath = (exp(sin(millis()/5000.0*PI))-0.36787944)*308.0;
-          bright = map(breath, 0, 255, 0, 20); // min breath, max breath, min brightness, max brightness
           FastLED.setBrightness(bright);
           break;
     }

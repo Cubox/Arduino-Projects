@@ -8,19 +8,39 @@ if [ $# -eq 0 ]; then
 fi
 
 i=$((0))
-beginning="$(date -r $(head -n 1 $1 | cut -d " " -f 1) "+%Y-%m-%d")T00:00:00"
+## Get the first value, which is a timestamp.
+## Turn it into a date entering only the day/month/year, and set it to midnight that day.
+#beginningText="$(date -r $(head -n 1 $1 | cut -d " " -f 1) "+%Y-%m-%d")T00:00:00"
+
+# Well now we're not doing that. We just take today and remove a day and let's go baby
+beginningText="$(date -v -1d "+%Y-%m-%d")T00:00:00"
+beginning="$(date -jf "%Y-%m-%dT%H:%M:%S" $beginningText "+%s")"
+# Get the last timestamp of the file. We'll use it later to stop the loop
 end=$(tail -n 1 $1 | cut -d " " -f 1)
 rm -rf "$1"-output
 mkdir "$1"-output
 
 while true; do
-    outfile="$1"-output/$(date -v +"$i"d -jf "%Y-%m-%dT%H:%M:%S" $beginning "+%Y-%m-%dT%H:%M:%S").txt
-    awk -v date=$(date -v +"$i"d -jf "%Y-%m-%dT%H:%M:%S" $beginning "+%s") '{if ($1 >= date && $1 < date + 86400) print $0;}' $1 > $outfile
+    # Use $beginning and add i days to it. Use that for the filename
+    outfile="$1"-output/$(date -r $beginning -v +"$i"d "+%Y-%m-%dT%H:%M:%S").txt
+    # Get the DST value for that day
+    if [[ $(date -r $beginning -v +"$i"d -v +6H +%z) == "+0100" ]];then
+        offset="+1H"
+    elif [[ $(date -r $beginning -v +"$i"d -v +6H +%z) == "+0200" ]];then
+        offset="+2H"
+    fi
+    # Now, we pass the timestamp of that day (midnight) as date. 
+    date=$(date -r $beginning -v +"$i"d -v $offset "+%s")
+    # enddate is the same with a day added
+    enddate=$(date -r $beginning -v +"$i"d -v $offset -v +1d "+%s")
+    # Use awk to filter out any lines where the timestamp is between date and enddate
+    awk -v date=$date -v enddate=$enddate '{if ($1 >= date && $1 < enddate) print $0;}' $1 > $outfile
     if [ ! -s ${outfile} ]; then
         rm $outfile
     fi
     i=$((i = i+1))
-    if [[ $(date -v +"$i"d -jf "%Y-%m-%dT%H:%M:%S" $beginning "+%s") -gt $end ]]; then
+    # We are at the end of the file
+    if [[ $(date -r $beginning -v +"$i"d "+%s") -gt $end ]]; then
         break
     fi
 done

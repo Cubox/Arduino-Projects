@@ -9,7 +9,7 @@
 #ifndef PORT
     #error PORT not defined
 #endif
-#define CURRENT_YEAR 2019
+#define CURRENT_YEAR 2020
 
 #define CALIBRATING false
 #if CALIBRATING
@@ -21,44 +21,30 @@
 // the offsets serve as calibration for the probes.
 #if PORT == 4201
     #define PROBEOFFSET GLOBALOFFSET // Always zero, since this is the reference
-    #define DS18B20
     #include "secrets1.h"
-#elif PORT == 4202
-    #define PROBEOFFSET -1.19+GLOBALOFFSET
-    #define KPROBE
-    #include "secrets2.h"
 #elif PORT == 4203
     #define PROBEOFFSET 0.54+GLOBALOFFSET
-    #define DS18B20
     #include "secrets3.h"
 #elif PORT == 4204
     #define PROBEOFFSET 0.37+GLOBALOFFSET
-    #define DS18B20
     #include "secrets4.h"
 #elif PORT == 4205
     #define PROBEOFFSET 0.72+GLOBALOFFSET
-    #define DS18B20
     #include "secrets5.h"
 #elif PORT == 4206
     #define PROBEOFFSET 0.41+GLOBALOFFSET
-    #define DS18B20
     #include "secrets6.h"
 #else
     #error Welp
 #endif
 
-#if defined(KPROBE)
-    #include <max6675.h>
-    MAX6675 thermocouple;
-    #define TIMEBETWEENREADS 250
-#elif defined(DS18B20)
-    #include <OneWire.h>
-    #include <DallasTemperature.h>
-    #define ONE_WIRE_BUS D3
-    #define TIMEBETWEENREADS 1000
-    OneWire oneWire(ONE_WIRE_BUS);
-    DallasTemperature sensors(&oneWire);
-#endif
+
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#define ONE_WIRE_BUS D3
+#define TIMEBETWEENREADS 1000
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 
 WiFiClient client;
 
@@ -93,12 +79,8 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
 
-    #if defined(KPROBE)
-        thermocouple.begin(D5, D6, D7);
-    #elif defined(DS18B20)
-        sensors.begin();
-        sensors.setResolution(12);
-    #endif
+    sensors.begin();
+    sensors.setResolution(12);
 
     WiFi.mode(WIFI_STA);
     // SSID and passwords are stored under the secretsx.h header.
@@ -149,12 +131,8 @@ void loop() {
     }
 
     if (millis() - readProbeLast >= TIMEBETWEENREADS) {
-        #if defined(KPROBE)
-            double reading = thermocouple.readCelsius();
-        #elif defined(DS18B20)
-            sensors.requestTemperaturesByIndex(0);
-            double reading = sensors.getTempCByIndex(0);
-        #endif
+        sensors.requestTemperaturesByIndex(0);
+        double reading = sensors.getTempCByIndex(0);
         readProbeLast = millis();
 
         if (reading < 0 || isnan(reading)) {

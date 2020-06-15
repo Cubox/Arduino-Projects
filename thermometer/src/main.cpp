@@ -12,42 +12,63 @@
 #define CURRENT_YEAR 2020
 
 #define CALIBRATING false
+#define UNKNOWNDEVICEADDRESS false
 #if CALIBRATING
     #include "secrets1.h"
 #endif
 
-#define GLOBALOFFSET 0.355
+#define GLOBALOFFSET 0.25
 
 // the offsets serve as calibration for the probes.
-#if PORT == 4201
-    #define PROBEOFFSET GLOBALOFFSET // Always zero, since this is the reference
+#if PORT == 4201 // Andy
     #include "secrets1.h"
-#elif PORT == 4203
-    #define PROBEOFFSET 0.54+GLOBALOFFSET
+    #define DEVICEADDRESS {0x28, 0xa9, 0x8d, 0x79, 0xa2, 0x16, 0x3, 0xd5}
+    #define PROBEOFFSET GLOBALOFFSET // Always zero, since this is the reference
+#elif PORT == 4202 // Bureau
+    #include "secrets2.h"
+    #define DEVICEADDRESS {0x28, 0xdf, 0xa4, 0x79, 0xa2, 0, 0x3, 0xb2}
+    #define PROBEOFFSET 0.35+GLOBALOFFSET
+#elif PORT == 4203 // Salon
     #include "secrets3.h"
-#elif PORT == 4204
-    #define PROBEOFFSET 0.37+GLOBALOFFSET
+    #define DEVICEADDRESS {0x28, 0x26, 0x90, 0x79, 0xa2, 0x16, 0x3, 0x8b}
+    #define PROBEOFFSET 0.6+GLOBALOFFSET
+#elif PORT == 4204 // Mina
     #include "secrets4.h"
-#elif PORT == 4205
-    #define PROBEOFFSET 0.72+GLOBALOFFSET
+    #define DEVICEADDRESS {0x28, 0xe5, 0x8b, 0x79, 0xa2, 0x16, 0x3, 0x41}
+    #define PROBEOFFSET 0.4+GLOBALOFFSET
+#elif PORT == 4205 // Couloir
     #include "secrets5.h"
-#elif PORT == 4206
-    #define PROBEOFFSET 0.41+GLOBALOFFSET
+    #define DEVICEADDRESS {0x28, 0x20, 0x51, 0x79, 0xa2, 0x16, 0x3, 0xd6}
+    #define PROBEOFFSET 0.83+GLOBALOFFSET
+#elif PORT == 4206 // Salle de bain
     #include "secrets6.h"
+    #define DEVICEADDRESS {0x28, 0xc1, 0xc0, 0x79, 0xa2, 0x16, 0x3, 0xb2}
+    #define PROBEOFFSET 0.51+GLOBALOFFSET
 #else
     #error Welp
 #endif
 
-
+#define REQUIRESALARMS false
+#define REQUIRESNEW false
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #define ONE_WIRE_BUS D3
 #define TIMEBETWEENREADS 1000
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
+DeviceAddress deviceAddress = DEVICEADDRESS;
 
 WiFiClient client;
 
+#if UNKNOWNDEVICEADDRESS
+    bool isnullDeviceAddress(DeviceAddress address) {
+        return (
+        address[0] == 0 && address[1] == 0 &&
+        address[2] == 0 && address[3] == 0 &&
+        address[4] == 0 && address[5] == 0 &&
+        address[6] == 0 && address[7] == 0);
+    }
+#endif
 
 // signal that there is a problem
 // The number of flashes are not reliable to determine origin of fail
@@ -55,24 +76,15 @@ WiFiClient client;
 void flashLed(unsigned char times) {
     for (unsigned char i = 0; i < times; i++) {
         digitalWrite(LED_BUILTIN, LOW);
-        delay(100);
+        delay(50);
         digitalWrite(LED_BUILTIN, HIGH);
         delay(100);
     }
 }
 
-void handleNotConnectedWifi(unsigned int *i) {
-    if (*i >= 100) {
-        ESP.restart();
-    }
-    flashLed(2);
-    delay(200);
-    (*i)++;
-}
-
-unsigned long sentDataLast, readProbeLast;
+unsigned long sentDataLast, lastConvRequest;
 double temperature;
-unsigned int temperatureCount, disconnectedCount;
+unsigned int temperatureCount, disconnectedCount, ntpFailed;
 
 void setup() {
     // the LED on the ESP are inverted from Arduinos. HIGH for OFF, LOW for ON
@@ -81,6 +93,8 @@ void setup() {
 
     sensors.begin();
     sensors.setResolution(12);
+    sensors.setWaitForConversion(false);
+    sensors.requestTemperaturesByAddress(deviceAddress);
 
     WiFi.mode(WIFI_STA);
     // SSID and passwords are stored under the secretsx.h header.
@@ -89,26 +103,39 @@ void setup() {
     // Without WiFi being up, we are useless. Restart the ESP after ~60s
     unsigned int i = 0;
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        handleNotConnectedWifi(&i);
+        if (i >= 100) {
+            ESP.restart();
+        }
+        flashLed(2);
+        delay(200);
+        i++;
     }
 
     ArduinoOTA.begin();
-    ArduinoOTA.onError([](ota_error_t error) {
-        ESP.restart();
-    });
     
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
+
     client.setNoDelay(true); // don't bunch up the packets
     client.setSync(true); // wait until the data is received before continue
     // This is a local server running netcat -l -k -w 5 PORT | tee log
     client.connect(SERVER, PORT);
+    
+    #if UNKNOWNDEVICEADDRESS
+        if (isnullDeviceAddress(deviceAddress)) {
+            sensors.getAddress(deviceAddress, 0);
+            client.printf("#Device address: %#x %#x %#x %#x %#x %#x %#x %#x\n",
+            deviceAddress[0], deviceAddress[1], deviceAddress[2], deviceAddress[3],
+            deviceAddress[4], deviceAddress[5], deviceAddress[6], deviceAddress[7]);
+        }
+    #endif
 
     sentDataLast = millis();
-    readProbeLast = 0; // we need an immediate reading
+    lastConvRequest = 0;
 
     temperature = 0;
     temperatureCount = 0;
     disconnectedCount = 0;
+    ntpFailed = 0;
 }
 
 void loop() {
@@ -120,45 +147,50 @@ void loop() {
     // But still need to call "end of loop" functions
     // (Also will be more obvious if there is a time problem, no output)
     if (year() != CURRENT_YEAR && year() != CURRENT_YEAR + 1) {
-        flashLed(5);
+        if (ntpFailed >= 100) {
+            ESP.restart();
+        }
+        ntpFailed++;
+        flashLed(1);
         NTP.begin("europe.pool.ntp.org", 1, true, 0);
         return;
     }
+    ntpFailed = 0;
 
     // if we lost the TCP server
     if (client.connected() == false) {
         client.connect(SERVER, PORT);
     }
 
-    if (millis() - readProbeLast >= TIMEBETWEENREADS) {
-        sensors.requestTemperaturesByIndex(0);
-        double reading = sensors.getTempCByIndex(0);
-        readProbeLast = millis();
+    if (millis() - lastConvRequest >= TIMEBETWEENREADS && sensors.isConversionComplete()) {
+        double reading = sensors.getTempC(deviceAddress);
 
         if (reading < 0 || isnan(reading)) {
-            client.printf("#Incorrect reading: %.3f\n", reading);
-            flashLed(10);
+            client.printf("#%lu %.3f\n", now(), reading);
+            flashLed(3);
             return;
         }
 
         temperature += reading;
         temperatureCount++;
+
+        sensors.requestTemperaturesByAddress(deviceAddress);
+        lastConvRequest = millis();
     }
 
     if (millis() - sentDataLast >= 25000 && temperatureCount > 0 && !isnan(temperature)) {
-        if (client.connected() && WiFi.isConnected()) {
-            client.printf("%ld %.3f\n", now(), (temperature / temperatureCount) + PROBEOFFSET);
+        if (client.connected() && WiFi.isConnected() && now() > 0) {
+            size_t len = client.printf("%lu %.3f\n", now(), (temperature / temperatureCount) + PROBEOFFSET);
             // We only update sentDataLast if we sent the data
-            // If we were unable to send data, we should not wait another 20s
-            // (see else block under here)
-            sentDataLast = millis();
-            disconnectedCount = 0;
+            if (len > 0) {
+                sentDataLast = millis();
+                disconnectedCount = 0;
+            }
         } else {
-            // after 100 tries (minimum of 1s of delay due to flashLed)
+            // after 100 tries
             // we need to restart the ESP, just in case
             // counter is reset each successful send
             if (disconnectedCount >= 100) {
-                flashLed(5);
                 ESP.restart();
             }
             disconnectedCount++;

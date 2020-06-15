@@ -1,9 +1,9 @@
 desktop.ini
 .vscode/
-thermocouple/include/secrets1.h
-thermocouple/include/secrets2.h
-thermocouple/include/secrets3.h
-thermocouple/include/secrets5.h
-thermocouple/include/secrets4.h
-thermocouple/include/secrets6.h
+thermometer/include/secrets1.h
+thermometer/include/secrets2.h
+thermometer/include/secrets3.h
+thermometer/include/secrets5.h
+thermometer/include/secrets4.h
+thermometer/include/secrets6.h
 TestCode/

@@ -15,24 +15,17 @@ const double multiplier = 0.0625;
 // This depends on the model of clamp being used
 const double FACTOR = 30;
 
+#define CURRENT_YEAR 2020
+
 WiFiClient client;
 
 void flashLed(unsigned char times) {
     for (unsigned char i = 0; i < times; i++) {
         digitalWrite(LED_BUILTIN, LOW);
-        delay(100);
+        delay(50);
         digitalWrite(LED_BUILTIN, HIGH);
         delay(100);
     }
-}
-
-void handleNotConnectedWifi(unsigned int *i) {
-    if (*i >= 100) {
-        ESP.restart();
-    }
-    flashLed(2);
-    delay(200);
-    (*i)++;
 }
 
 void setup() {
@@ -45,7 +38,12 @@ void setup() {
     // Without WiFi being up, we are useless. Kill ourselves until it works.
     unsigned int i = 0;
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        handleNotConnectedWifi(&i);
+        if (i >= 100) {
+            ESP.restart();
+        }
+        flashLed(2);
+        delay(200);
+        i++;
     }
 
     ArduinoOTA.begin();
@@ -62,6 +60,7 @@ void setup() {
 
 // Defined later
 double getCurrent();
+unsigned int ntpFailed = 0;
 
 // A full loop should happen once per second, plus a liiiiittle bit each time
 // Might be more if we are trying to reconnect to the server, or if NTP needs 
@@ -73,11 +72,16 @@ void loop() {
     // We are not reporting power use without the proper time
     // But still need to call "end of loop" functions
     // (Also will be more obvious if there is a time problem, no output)
-    if (year() != 2019 && year() != 2020) {
-        flashLed(5);
+    if (year() != CURRENT_YEAR && year() != CURRENT_YEAR + 1) {
+        if (ntpFailed >= 100) {
+            ESP.restart();
+        }
+        ntpFailed++;
+        flashLed(1);
         NTP.begin("europe.pool.ntp.org", 1, true, 0);
         return;
     }
+    ntpFailed = 0;
 
     if (!client.connected()) {
         client.connect("192.168.0.252", 4200);

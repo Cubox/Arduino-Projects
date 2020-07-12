@@ -13,6 +13,7 @@
 
 #define CALIBRATING false
 #define UNKNOWNDEVICEADDRESS false
+#define NULLDEVICEADDRESS {0, 0, 0, 0, 0, 0, 0, 0}
 #if CALIBRATING
     #include "secrets1.h"
 #endif
@@ -44,6 +45,10 @@
     #include "secrets6.h"
     #define DEVICEADDRESS {0x28, 0xc1, 0xc0, 0x79, 0xa2, 0x16, 0x3, 0xb2}
     #define PROBEOFFSET 0.51+GLOBALOFFSET
+#elif PORT == 4207 // Salle d'attente
+    #include "secrets7.h"
+    #define DEVICEADDRESS {0x28, 0xb4, 0x70, 0x79, 0xa2, 0, 0x3, 0xc8}
+    #define PROBEOFFSET -0.29+GLOBALOFFSET
 #else
     #error Welp
 #endif
@@ -93,7 +98,6 @@ void setup() {
 
     sensors.begin();
     sensors.setResolution(12);
-    sensors.setWaitForConversion(false);
     sensors.requestTemperaturesByAddress(deviceAddress);
 
     WiFi.mode(WIFI_STA);
@@ -112,6 +116,7 @@ void setup() {
     }
 
     ArduinoOTA.begin();
+    ArduinoOTA.setRebootOnSuccess(true);
     
     NTP.begin("europe.pool.ntp.org", 1, true, 0);
 
@@ -162,10 +167,10 @@ void loop() {
         client.connect(SERVER, PORT);
     }
 
-    if (millis() - lastConvRequest >= TIMEBETWEENREADS && sensors.isConversionComplete()) {
+    if (sensors.isConversionComplete()) {
         double reading = sensors.getTempC(deviceAddress);
 
-        if (reading < 0 || isnan(reading)) {
+        if (reading < -100 || isnan(reading)) {
             client.printf("#%lu %.3f\n", now(), reading);
             flashLed(3);
             return;

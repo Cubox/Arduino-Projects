@@ -53,12 +53,9 @@
     #error Welp
 #endif
 
-#define REQUIRESALARMS false
-#define REQUIRESNEW false
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #define ONE_WIRE_BUS D3
-#define TIMEBETWEENREADS 1000
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 DeviceAddress deviceAddress = DEVICEADDRESS;
@@ -87,7 +84,7 @@ void flashLed(unsigned char times) {
     }
 }
 
-unsigned long sentDataLast, lastConvRequest;
+unsigned long sentDataLast;
 double temperature;
 unsigned int temperatureCount, disconnectedCount, ntpFailed;
 
@@ -122,7 +119,6 @@ void setup() {
 
     client.setNoDelay(true); // don't bunch up the packets
     client.setSync(true); // wait until the data is received before continue
-    // This is a local server running netcat -l -k -w 5 PORT | tee log
     client.connect(SERVER, PORT);
     
     #if UNKNOWNDEVICEADDRESS
@@ -135,7 +131,6 @@ void setup() {
     #endif
 
     sentDataLast = millis();
-    lastConvRequest = 0;
 
     temperature = 0;
     temperatureCount = 0;
@@ -180,7 +175,6 @@ void loop() {
         temperatureCount++;
 
         sensors.requestTemperaturesByAddress(deviceAddress);
-        lastConvRequest = millis();
     }
 
     if (millis() - sentDataLast >= 25000 && temperatureCount > 0 && !isnan(temperature)) {

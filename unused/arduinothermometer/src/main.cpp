@@ -37,7 +37,7 @@ void loop() {
         sensors.requestTemperaturesByAddress(address);
     }
 
-    if (millis() - sentDataLast >= 30000) {
+    if (millis() - sentDataLast >= 20000) {
         if (temperatureCount > 0 && !isnan(temperature)) {
             #if NEEDDEVICEADDRESS
                 printf("%#x %#x %#x %#x %#x %#x %#x %#x: %.3f\n",

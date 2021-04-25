@@ -87,10 +87,10 @@ R"(
             </tr>
             <tr>
                 <td>
-                    <input type="number" id="red" name="red" class="input" value=%d>
+                    <input type="number" id="red" name="red" class="input" min="0" max="255" value=%d>
                 </td>
                 <td>
-                    <input type="number" id="green" name="green" class="input" value=%d>
+                    <input type="number" id="green" name="green" class="input" min="0" max="255" value=%d>
                 </td>
                 <td>
                     <input type="number" id="blue" name="blue" class="input" value=%d>
@@ -101,7 +101,7 @@ R"(
             <input type="range" id="brightness" name="brightness" class="input" min="0" max="255" value=%d>
         </div>
 
-        <input type="number" id="brightnessClone" name="brightnessClone" class="input">
+        <input type="number" id="brightnessClone" min="0" max="255" class="input">
         <input type="submit" value="Send" class="send">
         <button type="submit" name="rainbow" value="true" class="send rainbow">Rainbow</button>
         <button type="submit" name="epilepsy" value="true" class="send blinking">Epilepsy</button>
@@ -145,6 +145,5 @@ R"(
         });
     </script>
 </body>
-<!-- %s -->
 </html>
 )";

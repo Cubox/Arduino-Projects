@@ -4,6 +4,7 @@
 #include <TimeLib.h>
 #include <NTPClientLib.h>
 #include <WiFiClient.h>
+#include <lwip/etharp.h>
 
 #define SERVER "192.168.0.252"
 #ifndef PORT
@@ -97,14 +98,16 @@ void setup() {
     sensors.setResolution(12);
     sensors.requestTemperaturesByAddress(deviceAddress);
 
+    WiFi.setPhyMode(WIFI_PHY_MODE_11G);
     WiFi.mode(WIFI_STA);
+    // WiFi.setSleepMode(WIFI_NONE_SLEEP);
     // SSID and passwords are stored under the secretsx.h header.
     // we need to add the include dir to .gitignore
     WiFi.begin(SSID, PASSWORD);
     // Without WiFi being up, we are useless. Restart the ESP after ~60s
     unsigned int i = 0;
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        if (i >= 100) {
+        if (i >= 10) {
             ESP.restart();
         }
         flashLed(2);
@@ -147,7 +150,7 @@ void loop() {
     // But still need to call "end of loop" functions
     // (Also will be more obvious if there is a time problem, no output)
     if (year() != CURRENT_YEAR && year() != CURRENT_YEAR + 1) {
-        if (ntpFailed >= 100) {
+        if (ntpFailed >= 10) {
             ESP.restart();
         }
         ntpFailed++;
@@ -177,23 +180,31 @@ void loop() {
         sensors.requestTemperaturesByAddress(deviceAddress);
     }
 
-    if (millis() - sentDataLast >= 25000 && temperatureCount > 0 && !isnan(temperature)) {
+    if (millis() - sentDataLast >= 20000 && temperatureCount > 0 && !isnan(temperature)) {
         if (client.connected() && WiFi.isConnected() && now() > 0) {
             size_t len = client.printf("%lu %.3f\n", now(), (temperature / temperatureCount) + PROBEOFFSET);
             // We only update sentDataLast if we sent the data
             if (len > 0) {
                 sentDataLast = millis();
                 disconnectedCount = 0;
+            } else {
+                if (disconnectedCount >= 10) {
+                    ESP.restart();
+                }
+                disconnectedCount++;
+                flashLed(2);
+                client.connect(SERVER, PORT);
             }
         } else {
             // after 100 tries
             // we need to restart the ESP, just in case
             // counter is reset each successful send
-            if (disconnectedCount >= 100) {
+            if (disconnectedCount >= 10) {
                 ESP.restart();
             }
             disconnectedCount++;
             flashLed(2);
+            client.connect(SERVER, PORT);
         }
 
         temperatureCount = 0;

@@ -17,8 +17,6 @@ enum modes {
   OFF,
   ON,
   RAINBOW,
-  BORANGE,
-  BBLUE
 };
 
 enum modes mode = OFF;
@@ -67,10 +65,6 @@ void serialEvent() {
       mode = OFF;
     } else if (strcmp(buf, "R") == 0) {
       mode = RAINBOW;
-    } else if (strcmp(buf, "BO") == 0) {
-      mode = BORANGE;
-    } else if (strcmp(buf, "BB") == 0) {
-      mode = BBLUE;
     } else if ((buf2 = strstr(buf, "Br: ")) != NULL) {
       buf2 += 4;
       int received = atoi(buf2);
@@ -108,22 +102,6 @@ void loop() {
           FillLEDsFromPaletteColors(startIndex, right, RIGHTLED);
           FillLEDsFromPaletteColors(startIndex, left, LEFTLED);
           delay(5);
-          break;
-       case BORANGE: // orange breathing
-          FastLED.setBrightness(globalBrightness);
-          fill_solid(right, RIGHTLED, CRGB(255,30,0));
-          fill_solid(left, LEFTLED, CRGB(255,30,0));
-          breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-          bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
-          FastLED.setBrightness(bright);
-          break;
-       case BBLUE: // blue breathing
-          FastLED.setBrightness(globalBrightness);
-          fill_solid(right, RIGHTLED, CRGB::Blue);
-          fill_solid(left, LEFTLED, CRGB::Blue);
-          breath = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
-          bright = map(breath, 0, 255, 0, 255); // min breath, max breath, min brightness, max brightness
-          FastLED.setBrightness(bright);
           break;
     }
   }

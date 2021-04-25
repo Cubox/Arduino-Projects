@@ -5,6 +5,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <FastLED.h>
+#include <lwip/etharp.h>
 
 #include <TimeLib.h>
 #include <NTPClientLib.h>
@@ -16,7 +17,7 @@
 #define BRIGHTNESS 200
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
-CRGB leds[NUM_LEDS];
+CRGBArray<NUM_LEDS> leds;
 
 const char *ssid = SSID;
 const char *password = PASSWORD;
@@ -54,7 +55,7 @@ void handleIndexGet() {
     memset(bufferHtml, 0, sizeof(htmlTemplate) + 42);
     memset(bufferCss, 0, sizeof(htmlTemplateCSS));
     strcpy_P(bufferCss, htmlTemplateCSS);
-    sprintf_P(bufferHtml, htmlTemplate, bufferCss, savedConf.red, savedConf.green, savedConf.blue, savedConf.brightness, NTP.getTimeDateString().c_str());
+    sprintf_P(bufferHtml, htmlTemplate, bufferCss, savedConf.red, savedConf.green, savedConf.blue, savedConf.brightness);
     server.send(200, "text/html", bufferHtml);
     free(bufferHtml);
     free(bufferCss);
@@ -101,8 +102,11 @@ void handleIndexPost() {
 }
 
 void setup() {
+    Serial.begin(9600);
     EEPROM.begin(sizeof(struct configuration));
+    WiFi.setPhyMode(WIFI_PHY_MODE_11G);
     WiFi.mode(WIFI_STA);
+    // WiFi.setSleepMode(WIFI_NONE_SLEEP);
     WiFi.begin(ssid, password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
         delay(100);
@@ -135,7 +139,7 @@ void setup() {
 }
 
 void FillLEDsFromPaletteColors(uint8_t colorIndex) {
-    for (int i = 0; i < NUM_LEDS; i++) {
+    for (int i = NUM_LEDS-1; i >= 0; i--) {
         leds[i] = ColorFromPalette(currentPalette, colorIndex, loopConf.brightness, currentBlending);
         colorIndex += 3;
     }
@@ -162,10 +166,10 @@ void loop() {
 
     time_t t = now();
 
-    if (year() != 2019 && year() != 2020) {
-        rgb(&loopConf, 255, 0, 0);
-        loopConf.brightness = 255;
-        toUpdate = true;
+    if (year() != 2021 && year() != 2022 && year() != 2023 && year() != 2024 && year() != 2025 && year() != 2026 && year() != 2027 && year() != 2028) {
+        //rgb(&loopConf, 255, 0, 0);
+        //loopConf.brightness = 255;
+        //toUpdate = true;
         NTP.begin("europe.pool.ntp.org", 1, true, 0);
         goto end; // Hehe, fight me
     }
@@ -174,19 +178,21 @@ void loop() {
         rgb(&loopConf, 255, 0, 0);
         loopConf.brightness = 255;
         toUpdate = true;
+        goto end;
     } else if (hour(t) == 23 && minute(t) == 0 && second(t) == 2) { // two seconds later, dim the brightness.
         savedConf.brightness = 50;
-        toUpdate = true;
-    } else if (hour(t) == 7 && minute(t) == 0 && second(t) == 0) { // 7 am, lights off
+    } else if (hour(t) == 8 && minute(t) == 0 && second(t) == 0) { // 7 am, lights off
         savedConf.brightness = 0;
-    } else if (hour(t) == 18 && minute(t) == 0 && second(t) == 0) {
+    } else if (hour(t) == 17 && minute(t) == 0 && second(t) == 0) {
         if (savedConf.brightness < 100) {
             savedConf.brightness = EEPROM.read(offsetof(struct configuration, brightness));
             if (savedConf.brightness < 100) {
                 savedConf.brightness = 100;
             }
         }
-    } else if (hour(t) >= 8 && minute(t) == 0 && second(t) <= 5) {
+    }
+
+    if (hour(t) >= 8 && minute(t) == 0 && second(t) <= 5) {
         loopConf.rainbow = true;
         loopConf.breath = false;
         loopConf.epilepsy = false;
@@ -211,10 +217,13 @@ void loop() {
 
 end:
     if (toUpdate && !loopConf.rainbow) {
-        fill_solid(leds, NUM_LEDS, CRGB(loopConf.red, loopConf.green, loopConf.blue));
+        leds(0, 3).fill_solid(CRGB(scale8(loopConf.red, 130), loopConf.green, loopConf.blue));
+        leds(4, 129).fill_solid(CRGB(loopConf.red, loopConf.green, loopConf.blue));
+        leds(130, 140).fill_solid(CRGB(scale8(loopConf.red, 130), scale8(loopConf.green, 150), loopConf.blue));
+        leds(140, 141).fill_solid(CRGB(scale8(loopConf.red, 170), scale8(loopConf.green, 100), loopConf.blue));
     }
 
-    if (!loopConf.breath) {
+    if (toUpdate && !loopConf.breath) {
         FastLED.setBrightness(loopConf.brightness);
     }
 

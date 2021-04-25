@@ -1,9 +1,10 @@
 desktop.ini
 .vscode/
-thermometer/include/secrets1.h
-thermometer/include/secrets2.h
-thermometer/include/secrets3.h
-thermometer/include/secrets5.h
-thermometer/include/secrets4.h
-thermometer/include/secrets6.h
-TestCode/
+unused/thermometer/include/secrets1.h
+unused/thermometer/include/secrets2.h
+unused/thermometer/include/secrets3.h
+unused/thermometer/include/secrets5.h
+unused/thermometer/include/secrets4.h
+unused/thermometer/include/secrets6.h
+unused/thermometer/include/secrets7.h
+unused/thermdisplay/include/secrets1.h

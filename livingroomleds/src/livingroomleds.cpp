@@ -85,7 +85,7 @@ void handleIndexPost() {
         savedConf.breath = false;
     } else if (server.arg("breath") != "") {
         savedConf.breath = true;
-        savedConf.rainbow = false;
+        //savedConf.rainbow = false;
         savedConf.epilepsy = false;
     } else {
         savedConf.epilepsy = false;
@@ -104,7 +104,7 @@ void handleIndexPost() {
 void setup() {
     Serial.begin(9600);
     EEPROM.begin(sizeof(struct configuration));
-    WiFi.setPhyMode(WIFI_PHY_MODE_11G);
+    WiFi.setPhyMode(WIFI_PHY_MODE_11N);
     WiFi.mode(WIFI_STA);
     // WiFi.setSleepMode(WIFI_NONE_SLEEP);
     WiFi.begin(ssid, password);
@@ -115,12 +115,6 @@ void setup() {
     EEPROM.get(0, savedConf);
 
     ArduinoOTA.setHostname("leds.cubox");
-
-    ArduinoOTA.onStart([]() {
-        fill_solid(leds, NUM_LEDS, CRGB::Red);
-        FastLED.setBrightness(255);
-        FastLED.show();
-    });
 
     ArduinoOTA.begin();
 
@@ -202,13 +196,15 @@ void loop() {
 
     if (loopConf.rainbow) {
         FillLEDsFromPaletteColors(startIndex);
-    } else if (loopConf.epilepsy) {
+    }
+    if (loopConf.epilepsy) {
         FastLED.delay(20);
         FastLED.setBrightness(0);
         FastLED.show();
         FastLED.delay(20);
         startIndex += 1;
-    } else if (loopConf.breath) {
+    }
+    if (loopConf.breath) {
         double breathValue, modifiedBrightness;
         breathValue = (exp(sin(millis()/2000.0*PI))-0.36787944)*108.0;
         modifiedBrightness = ::map(breathValue, 0, 255, 20, loopConf.brightness);

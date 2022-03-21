@@ -1,27 +1,33 @@
 #include <Arduino.h>
-#include <U8g2lib.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HttpClient.h>
+#include <Wire.h>
 #include "secrets.h"
 
-#ifdef U8X8_HAVE_HW_SPI
-#include <SPI.h>
-#endif
-#ifdef U8X8_HAVE_HW_I2C
-#include <Wire.h>
-#endif
+#include <GxEPD2_BW.h> // including both doesn't use more code or ram
+#include <GxEPD2_3C.h> // including both doesn't use more code or ram
+#include "GxEPD2_display_selection_new_style.h"
+#include <Fonts/FreeMonoBold18pt7b.h>
 
 const char *ssid = SSID;
 const char *password = PASSWORD;
 
-U8G2_SH1107_64X128_F_HW_I2C u8g2(U8G2_R1);
+const char Text[] = "1111 PPM";
+
+uint16_t x;
+uint16_t y;
 
 void setup(void) {
-    randomSeed(analogRead(0));
     Serial.begin(9600);
-    u8g2.begin();
-    u8g2.clearBuffer();
-    u8g2.sendBuffer();
+    display.init();
+    display.setRotation(3);
+    display.setFont(&FreeMonoBold18pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    int16_t tbx, tby; uint16_t tbw, tbh;
+    display.getTextBounds(Text, 0, 0, &tbx, &tby, &tbw, &tbh);
+    // center the bounding box by transposition of the origin:
+    x = ((display.width() - tbw) / 2) - tbx;
+    y = ((display.height() - tbh) / 2) - tby;
     WiFi.setPhyMode(WIFI_PHY_MODE_11N);
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
@@ -46,13 +52,15 @@ void loop(void) {
             }
             strcat(buf, " PPM");
             Serial.println(buf);
-            u8g2.clearBuffer();
-            u8g2.setFont(u8g2_font_crox5hb_tr);	// choose a suitable font
-            u8g2.drawStr(0+random(10), 30+random(20), buf);	// write something to the internal memory
-            u8g2.setContrast(0);
-            u8g2.sendBuffer();
+            display.setFullWindow();
+            display.firstPage();
+            do {
+                display.fillScreen(GxEPD_WHITE);
+                display.setCursor(x, y);
+                display.print(buf);
+            } while (display.nextPage());
             http.end();
         }
     }
-    delay(1000 * 60);
+    delay(1000 * 60 * 5);
 }

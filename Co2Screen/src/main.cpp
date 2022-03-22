@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266Ping.h>
 #include <ESP8266HttpClient.h>
 #include <Wire.h>
 #include "secrets.h"
@@ -17,8 +18,11 @@ const char Text[] = "1111 PPM";
 uint16_t x;
 uint16_t y;
 
+const IPAddress raven(192, 186, 0, 4);
+
 void setup(void) {
     Serial.begin(9600);
+    Serial.println();
     display.init();
     display.setRotation(3);
     display.setFont(&FreeMonoBold18pt7b);
@@ -39,27 +43,33 @@ void setup(void) {
 
 void loop(void) {
     if (WiFi.status() == WL_CONNECTED) {
-        WiFiClientSecure client;
-        HTTPClient http;
-        client.setInsecure();
-        http.begin(client, "https://cubox.dev/files/co2");
-        if (http.GET() == 200) {
-            char buf[32];
-            strcpy(buf, http.getString().c_str());
-            char *newline = strchr(buf, '\n');
-            if (newline != NULL) {
-                *newline = 0;
+        if (Ping.ping("192.168.0.42") && Ping.ping("192.168.0.5")) {
+            WiFiClientSecure client;
+            HTTPClient http;
+            client.setInsecure();
+            http.begin(client, "https://cubox.dev/files/co2");
+            if (http.GET() == 200) {
+                char buf[32];
+                strcpy(buf, http.getString().c_str());
+                char *newline = strchr(buf, '\n');
+                if (newline != NULL) {
+                    *newline = 0;
+                }
+                if (strlen(buf) == 0) {
+                    strcpy(buf, "ERROR");
+                } else {
+                    strcat(buf, " PPM");
+                }
+                Serial.println(buf);
+                display.setFullWindow();
+                display.firstPage();
+                do {
+                    display.fillScreen(GxEPD_WHITE);
+                    display.setCursor(x, y);
+                    display.print(buf);
+                } while (display.nextPage());
+                http.end();
             }
-            strcat(buf, " PPM");
-            Serial.println(buf);
-            display.setFullWindow();
-            display.firstPage();
-            do {
-                display.fillScreen(GxEPD_WHITE);
-                display.setCursor(x, y);
-                display.print(buf);
-            } while (display.nextPage());
-            http.end();
         }
     }
     delay(1000 * 60 * 5);

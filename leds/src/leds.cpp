@@ -7,6 +7,8 @@
 #define LEFTPIN 8
 #define LEFTLED 33
 
+#define WEBCAMLEDS 8
+
 CRGB right[RIGHTLED];
 CRGB left[LEFTLED];
 
@@ -17,10 +19,11 @@ enum modes {
   OFF,
   ON,
   RAINBOW,
+  WEBCAM,
 };
 
 enum modes mode = OFF;
-char globalBrightness = 150;
+char globalBrightness = 255;
 bool toUpdate = false;
 
 void setup() {
@@ -72,6 +75,8 @@ void serialEvent() {
         return;
       }
       globalBrightness = received;
+    } else if (strcmp(buf, "WEBCAM") == 0) {
+      mode = WEBCAM;
     } else {
       return;
     }
@@ -84,8 +89,6 @@ void serialEvent() {
 uint8_t startIndex = 0;
 
 void loop() {
-  float breath;
-  float bright;
   if (toUpdate) {
     switch (mode) {
       case OFF: FastLED.setBrightness(0); toUpdate = false; break; // off
@@ -102,6 +105,14 @@ void loop() {
           FillLEDsFromPaletteColors(startIndex, right, RIGHTLED);
           FillLEDsFromPaletteColors(startIndex, left, LEFTLED);
           delay(5);
+          break;
+      case WEBCAM:
+          FastLED.setBrightness(globalBrightness);
+          fill_solid(right, RIGHTLED - WEBCAMLEDS, CRGB(255,223,69));
+          fill_solid(left, LEFTLED - WEBCAMLEDS, CRGB(255,223,69));
+          fill_solid(right + RIGHTLED - WEBCAMLEDS, WEBCAMLEDS, CRGB(0,0,0));
+          fill_solid(left + LEFTLED - WEBCAMLEDS, WEBCAMLEDS, CRGB(0,0,0));
+          toUpdate = false;
           break;
     }
   }
